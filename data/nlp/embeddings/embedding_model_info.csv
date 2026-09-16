@@ -1,0 +1,2 @@
+model,embedding_dimension,normalization,records
+all-MiniLM-L6-v2,384,L2 normalized,4848

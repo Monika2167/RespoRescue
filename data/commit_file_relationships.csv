@@ -1,0 +1,761 @@
+pr_number,commit_sha,commit_message,author,commit_date,has_files
+335641,00c1bd1e901fa496cde70b4baa2e2cfd3742cdfd,fix(microsoft-authentication): persist rejected refresh tokens before retry,gaspardruan,2026-09-11T04:49:16Z,True
+335618,710dd9860b2cb11d3b7f1fc436f3010e997ae4fd,"fix: keep diff markers out of markdown list prefixes
+
+Fixes #335469",arpankanwer,2026-09-11T03:26:35Z,True
+335618,0aa93ee7ebb75e512be9b08811fc1ba9adb25e8b,fix: cover blockquote and empty markers in diff list prefix,arpankanwer,2026-09-11T03:42:06Z,True
+335615,dac5d24dc20066af8a0bc7fb694f86c079bfcc09,"fix: re-assert active editor context on workspace trust change
+
+Fixes #335608
+Re-observes the active editor when workspace trust changes so File > Save
+precondition on activeEditor context re-evaluates without requiring an editor switch.",arpankanwer,2026-09-11T02:49:42Z,True
+335613,97031bdb15f84c15721a8119843dec2d72ee208b,Enable session-specific sandbox settings,dileepyavan,2026-09-09T22:03:14Z,True
+335613,229facda6b80e0c6415a97dccb1455749b03e519,Merge origin/main into DileepY/333900_1,dileepyavan,2026-09-09T22:18:39Z,True
+335613,875dda7707d64e11d65c5264e87ff62146a102a6,Fix Copilot sandbox test launch credentials,dileepyavan,2026-09-09T23:58:39Z,True
+335613,b29b5486f9706362c7ba360676f05de2822163b0,Merge branch 'main' into DileepY/333900_1,dileepyavan,2026-09-10T03:01:24Z,True
+335613,d756d71913f31c761c723a5a896c73a1b5fe8d5b,fixing session picker state,dileepyavan,2026-09-10T05:53:50Z,True
+335613,96bb65f6741ae487e77852301f717054f22e262d,Merge remote-tracking branch 'origin/DileepY/333900_1' into DileepY/333900_1,dileepyavan,2026-09-10T05:54:59Z,True
+335613,e07138ad6e5d2bcbd135ce06e762c42d7c1db59c,Use regular sandbox settings for agent host forwarding,dileepyavan,2026-09-10T06:22:48Z,True
+335613,66aa71bf796b1604f2e038ecb4ba5af80e5b7ad2,Remove unrelated blank line from sandbox tests,dileepyavan,2026-09-10T06:28:19Z,True
+335613,218cfe5c4638a91161d38a883cffe1b03db06112,Merge origin/main into DileepY/333900_1,dileepyavan,2026-09-10T06:38:54Z,True
+335613,5b8baa70b70250f1a1518a018b549f25d4353a4b,Keep combined agent host sandbox picker state synchronized,dileepyavan,2026-09-10T06:52:06Z,True
+335613,b055b7fd683749310a524d34a527e499ca633516,Preserve metadata for ordinary agent host tool approvals,dileepyavan,2026-09-10T07:09:35Z,True
+335613,7d996c0f9f7ad3807d4f9e86c9652b877ea3789c,Fix sandbox policy mock in chat component fixtures,dileepyavan,2026-09-10T07:38:16Z,True
+335613,3d21c31ec777f08fbb724d707fe38edf381f3f2c,Refactor and bug fixing,dileepyavan,2026-09-10T23:58:34Z,True
+335613,8bfa8be4dbf439e1922de08d1275d222f3b8835b,"Merge origin/main and repair sandbox picker conflict resolutions
+
+Remove duplicated declarations, control flow, and tests from merge resolutions while preserving incoming Agent Host changes.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",dileepyavan,2026-09-11T02:16:56Z,True
+335613,d1da1e8a5f1a6dfc9b8b9a2701fef3acdbd2d7fd,Merge branch 'main' into DileepY/333900_1,dileepyavan,2026-09-11T03:58:06Z,True
+335613,278829869c15ae849e0b0a40ee72c1f5681d04f9,Review comments,dileepyavan,2026-09-11T04:08:20Z,True
+335613,88c27ad8477d3a9e9ccd1a999e3b3801a3ba5d55,"Merge remote updates before publishing host OS recovery fix
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",dileepyavan,2026-09-11T04:09:37Z,True
+335613,278088721be7c05e4c5b1c37658d7821cbc2b3a4,"Fix spurious subagent turns after task completion
+
+Resume retained subagents only at user-message or assistant turn-start boundaries, not on late output or usage events. Add a deterministic regression for the extra completed child turn seen in CI.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",dileepyavan,2026-09-11T04:19:39Z,True
+335613,3f3b6c606a0079b3da4a1aaccaae0cb37e812015,"Remove obsolete AgentHost sandbox smoke test
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",dileepyavan,2026-09-11T04:23:48Z,True
+335613,7e3f2ab3df101e7164125c2dc779e08413554edf,"Fix AgentHost smoke suite setup after sandbox test removal
+
+Pass an empty settings object to the shared setup helper so the remaining local AgentHost smoke tests compile and use default settings.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",dileepyavan,2026-09-11T04:30:36Z,True
+335613,db6e4862999058cc7f52bf84d8030c7efe644b14,"Keep upstream subagent lifecycle behavior in sandbox PR
+
+Revert the unrelated lifecycle changes from 278088721be and their tests. Preserve main's subagent resumption behavior while retaining the sandbox fixes.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",dileepyavan,2026-09-11T05:01:11Z,True
+335613,5cf3e2d5554dec936596eda69c81a042f2f741ce,"Remove unrelated whitespace change from sandbox PR
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",dileepyavan,2026-09-11T05:07:16Z,True
+335613,0f6d3e3e2e9d900f4b9c4f663df6554eb82c2417,"Fix sandbox picker host service mocks in component fixtures
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",dileepyavan,2026-09-11T05:29:57Z,True
+335611,5d4074ff71877ff85e500892f5a809a8d1927ead,"chat: reserve pet space outside responses
+
+Use chat list bottom padding for the pet clearance so response rows end with their content while preserving scroll-to-end behavior and persistent-content spacing.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",TylerLeonhardt,2026-09-11T02:04:13Z,True
+335611,fab6a00479db2ba1e2a59a96c0e280d4e4a0fa21,"chat: scale pet transcript padding
+
+Derive the transcript clearance from the pet scale so Grow and Shrink keep the final response unobstructed without excess space.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",TylerLeonhardt,2026-09-11T02:18:37Z,True
+335595,df4ac6382b1783b6baec74489776e06b56b92f23,"automations: fix: synchronize restored Cloud model options
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-08T09:39:05Z,True
+335595,173f1775abaaa5b3612cb1274b4606c206607c45,"automations: fix: preserve canonical Cloud configuration
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-08T09:39:08Z,True
+335595,deabc94ebcbeee8ec57e35efd0cbb922b4754c0f,"automations: fix: ignore unsupported Cloud permission overrides
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-08T09:39:11Z,True
+335595,f870ec0dc069dce6c45f32bc5dbcf98116fd429c,"automations: fix: clamp restored CLI approval preferences
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-08T09:39:15Z,True
+335595,558f45ca91d5f2d36bf026008a27b194c5c673d2,"automations: fix: persist Cloud Sandbox execution choices
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-08T09:39:18Z,True
+335595,a2edf971fb6048f5aaa4da87a75d4979bf59491f,"automations: fix: retain custom agents on the first run turn
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-08T09:39:21Z,True
+335595,564cd05e5e50e1e5f96f2c960c52d6bb3d04cec6,"codex: fix: retain workspace agents across worktree turns
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-08T09:39:29Z,True
+335595,66ee5f960b032875783ab5c1779499cb4142cab2,"automations: fix: expose native provider configuration controls
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-08T09:39:33Z,True
+335594,7d16dde82d7c9729a0f9802ec68f9e34c55ad8db,"Fix forked process console forwarding reporting shared references as circular
+
+The JSON.stringify replacer in bootstrap-fork's safeToString pushed every
+object into a `seen` array and never removed anything, so a value that is
+referenced twice in the console arguments of a forked process (a DAG, not
+a cycle) was forwarded to the parent as ""[Circular]"" after its first
+occurrence. For example console.log(shared, { a: shared, b: shared })
+arrived as [{""value"":1},{""a"":""[Circular]"",""b"":""[Circular]""}].
+
+Track only the current ancestor path instead, using the replacer's `this`
+(the holder) to drop subtrees that are finished. True cycles are still
+reported as ""[Circular]"". The isObject helper is gone: every object has
+to be tracked for the holder check to work, and RegExp/Date were the only
+exclusions (a Date is already a string by the time the replacer sees it).
+
+Added an integration test that forks bootstrap-fork with a fixture that
+logs a shared reference and a genuine cycle.",Dev-next-gen,2026-09-10T23:22:24Z,True
+335594,3fa8626aca08f9acb2480cfd60e322d8c29d53ee,"Simplify comment on JSON serialization logic
+
+Co-authored-by: Copilot Autofix powered by AI <175728472+Copilot@users.noreply.github.com>",Dev-next-gen,2026-09-10T23:28:15Z,True
+335593,e4bf46675c893125c0c413ac2be65defccf00afd,"automations: fix: revert broad provider configuration changes
+
+Revert 1328607eb90d69b7a66fb2e8d4fdca49dcc0f9d3 (#335018) so the worktree availability fix and unrelated provider configuration changes can be reviewed separately. Preserve subsequent main changes and the independent ActionList PR.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-10T23:12:08Z,True
+335593,afac4abfbeb5bf5362a0d7233e0cdb5e5224cea3,"agentHost: fix: mark generated worktree sessions pending early
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-08T09:39:25Z,True
+335593,fd1a5ccfea305975d3ee90e7e59a59026160bd97,"automations: fix: advertise worktrees for all Agent Host agents
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-08T09:39:37Z,True
+335593,a498f2a7a8886490a234f2f9546ead9c59f45ccb,"automations: fix: resolve worktree branches on the selected host
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-08T09:39:42Z,True
+335593,3ef1c18e5ebc32197a7f7cddc48a1708dccde712,"automations: fix: allow leaving unavailable worktree isolation
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-08T09:39:47Z,True
+335593,00eea67533c542a74494edddcc473cd762a702e4,"automations: fix: coalesce repository option reloads
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-08T09:39:51Z,True
+335593,cc892bc126bdcd597ed5a9fe775d862e9ebe1032,"automations: fix: validate workspace worktree support in tools
+
+Consult provider-owned workspace capabilities before accepting an explicit worktree target. Preserve legacy providers and unrelated edits, propagate lookup failures, and cancel pending validation without writing.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-10T15:58:55Z,True
+335593,790568f194ff986449c9c1fb62142149fc8e09d7,"automations: fix: prevent invalid worktree re-enablement
+
+Keep the saved-branch exception only while Worktree is already selected. After opting out, require available repository branches before enabling isolation again.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: e4e70d7c-fbe2-487b-a6c5-177af2abae2f",ulugbekna,2026-09-10T15:59:11Z,True
+335583,5454eb39e640101f58c0b2a0b12167deb19cb670,"sessions: add rich GitHub reference hovers
+
+Reuse the existing issue and pull request hover components for dropdown details, with compact metadata, explicit spacing ownership, and bounded readable descriptions. Integrate the pill, row action, detail link, and branch-copy controls into one accessible keyboard flow.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T22:32:37Z,True
+335583,14a2316d08a84c6891a938b1c73431501702f8a1,"sessions: refine GitHub reference hover metadata
+
+Use existing relative-time, title, spacing, and popup patterns consistently across standalone and collection references. Bound long titles, keep transient content concise, and make HTML hover padding ownership explicit.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-11T00:06:06Z,True
+335583,2964a422d7ef29a193704c5082eaa20b537cefd1,"sessions: tighten GitHub hover title spacing
+
+Use the existing 8px SessionSummaryHover rhythm between the title and description in both standalone and collection cards.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-11T00:12:23Z,True
+335583,04dc0821969df3714f19b9bb548eeea1d04d0480,"sessions: balance GitHub hover row spacing
+
+Let the card root own a uniform 8px gap between metadata, title, description, and branch rows instead of splitting relationship spacing across child padding.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-11T00:17:18Z,True
+335583,41c94f26423fe937ec9fd14c496f6bd3aba6ddb4,"sessions: align GitHub hover content hierarchy
+
+Follow GitHub hover cards for provenance, title and ID, state, context, routing, and author order while preserving VS Code styling and the bounded transient content budget.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-11T00:57:28Z,True
+335583,6e90f3dda7c414e290b5349a30f54d62020aa339,"sessions: keep GitHub reference IDs with titles
+
+Group the final visible title word with the linked reference ID, bound pathological titles safely, and allow narrow cards to wrap without clipping focusable content.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-11T01:34:03Z,True
+335583,ddc49a388e014f63917fea30644af4a03e20c0b6,"sessions: address GitHub hover review feedback
+
+Use measured submenu height for positioning and reveal the full bounded GitHub title when keyboard focus reaches its linked reference.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-11T03:04:54Z,True
+335583,b84935b667a300bfdaaba3e54d990e22a256ecaf,"hover: align footer action icons and labels
+
+Render shared hover actions as centered inline flex rows so codicons and text use the same vertical center.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-11T03:49:54Z,True
+335583,357c7e883c95a70ff44dae39350068cf4ae4ff5e,"sessions: align GitHub reference metadata
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-11T04:15:59Z,True
+335576,2d0308e13b0f959b734e2cfbd1292a0aded837b2,"sessions: Fix mobile Voice Mode controls
+
+Use one composer-local predicate for standalone and segmented voice controls, and preserve native touch activation inside the segmented control.\n\nFixes #335575\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",meganrogge,2026-09-10T21:55:16Z,True
+335576,32735ca33624a4e49cf0dc7a7a98194fb3557230,"sessions: Pass voice pill state to dictation control
+
+Fixes #335575\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",meganrogge,2026-09-10T21:59:28Z,True
+335576,fa66434e78f58145d05c6d06ead1af89e7b5383d,"sessions: Keep new chat voice controls mutually exclusive
+
+Make the new-session toolbar own the final standalone dictation visibility so a late pill activation cannot leave both controls visible. Add regression coverage for all availability combinations.\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",meganrogge,2026-09-10T22:02:14Z,True
+335576,693c3aaa7128107b7cdaa1dce159f10a74e66028,"chat: Test segmented voice controls on touch
+
+Cover Voice power and mute activation through the parent ActionBar touch path so compatibility-click suppression cannot regress unnoticed.\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",meganrogge,2026-09-10T22:06:05Z,True
+335568,4ba5756067847380e3cbe62ced241d34587684f4,"Use TextMate highlighting in component fixtures
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",hediet,2026-09-10T21:30:17Z,True
+335568,f5bbca5b1d59981220f4fc4799b767c7c10d571f,"Fix TextMate fixture CI failures
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",hediet,2026-09-10T22:08:48Z,True
+335564,345b66d6a69a9842fc7626162d1e03eae2c62ebc,"Use MAI for dictation on web
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",meganrogge,2026-09-10T21:27:23Z,True
+335564,bdac5a81a6308877f49b9adfec6352331fcf8ed8,"Respect dictation policy on web
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",meganrogge,2026-09-10T21:43:52Z,True
+335564,2092bed3ff95709572520474886108dfb834c906,"Fix dictation hover browser test
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",meganrogge,2026-09-10T21:55:29Z,True
+335562,982f0f7db4a929ab10322a700cd38571006e06a8,"agentHost: prevent late events from reopening subagents
+
+Task status can mark a subagent idle before its final SDK output events arrive. Remember completed agent IDs so those trailing events cannot synthesize an extra child turn, while explicit user-message and tool-start boundaries can still resume retained agents.\n\nAdd regression coverage for a late child message followed by another idle task-status update.\n\n(Written by Copilot)\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",roblourens,2026-09-10T21:24:05Z,True
+335562,d3ca235c3c778fcf563ba83f2e8bc98be14c038b,"agentHost: quarantine late completed-subagent events
+
+Drop trailing completed-child events before they mutate response-part or usage state, and reset child-scoped part IDs when a real user or tool boundary resumes the retained agent.\n\nExtend coverage through idle, late output and usage, an explicit user-message resume, and fresh output and usage.\n\n(Written by Copilot)\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",roblourens,2026-09-10T22:16:03Z,True
+335562,c460a66df1aa4f811d5fbcf420e7152afd0d9350,"Merge main into fix-flaky-e2e-test-custom-agent
+
+(Written by Copilot)\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",roblourens,2026-09-10T22:29:50Z,True
+335562,e97bc87111d2a42781a4912fee3ac0f73cbd426c,"agentHost: treat child turn start as resume boundary
+
+Allow assistant.turn_start to authoritatively resume a completed retained subagent before model-call completion is mapped.\n\n(Written by Copilot)\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",roblourens,2026-09-10T22:33:01Z,True
+335553,fface9953ceb9b464697526f2c46a32808822021,"Add component fixture focus controls
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",hediet,2026-09-10T20:30:17Z,True
+335547,3d6d2c336fb65bb4db776bc237b1beabe87a9f49,Fix Codex steering acknowledgement with attachment context,RyanEwen,2026-09-10T19:58:56Z,True
+335542,657e81ee82f546c6b206c7150bd3407c23a24e6a,Fix narrow icons in compact view,lramos15,2026-09-10T19:41:24Z,True
+335525,18203d0ab790064123208e44e06af9ec9247b25a,agentHost: update bundled Codex SDK to 0.153.0,github-actions[bot],2026-09-10T14:20:24Z,True
+335525,9805e0f253c0cf75e885e3cfbc3d8c904c71fd04,"agentHost: adapt to Codex 0.153.0 protocol
+
+Codex 0.153.0 adds writeStdin guardian reviews and required nullable response fields.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",vs-code-engineering[bot],2026-09-10T15:17:48Z,True
+335525,8695274db35fbfa738afde6a34f7bc9b0a928c27,Merge branch 'main' into automation/bump-codex-sdk-0.153.0,Giuspepe,2026-09-10T18:31:54Z,True
+335525,93e0e8779facbf4b5f6d7ccf899661ad570bf814,Merge branch 'main' into automation/bump-codex-sdk-0.153.0,Giuspepe,2026-09-10T18:49:21Z,True
+335525,58826e9302a8f03d4d4b6df13dd665d0b2dd5725,signing commit,Giuspepe,2026-09-10T20:52:00Z,False
+335525,0df889b0c00bf9a6467ce268cf6091c0765b6c6a,"Merge main into Codex SDK bump branch
+
+Sync to the main revision exercised by the failing Compile & Hygiene run.",Giuspepe,2026-09-10T22:33:37Z,True
+335525,ecaa15e16def3c28fdb9e53e8bc9b8636ce8cf41,agentHost: align Codex configuration fixture with SDK 0.153.0,Giuspepe,2026-09-10T22:34:16Z,True
+335515,c81724e6525b70d36d678e906d732a89d74cff76,"mcp: trust workspace-root servers with workspace trust
+
+Align root .mcp.json with .vscode/mcp.json while retaining workspace-trust checks and sensitive-file edit protections. Add coverage for workspace consent, cached server trust decisions, and first autostart after delayed discovery.
+
+Fixes #335514
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",vritant24,2026-09-10T17:09:54Z,True
+335515,3dd1b4602ecae10714faf0045b013c83e2b8eb0d,Merge branch 'main' into fix/workspace-dot-mcp-trust,vritant24,2026-09-10T17:18:34Z,True
+335511,59af67806801a2fe94727bc9124fff762666219c,"automations: feat: add shareable automation blueprints
+
+Add a portable .automation.md format with strict validation and safe import/export semantics. Surface enabled plugin blueprints as disabled-by-default templates while preserving the existing automation service as the sole execution authority.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",ulugbekna,2026-09-09T21:29:33Z,True
+335511,398e796fca7535f5660daf0976ac0b2b2a3b8de5,"automations: feat: support blueprint drag and drop
+
+Match the Automation header action sizing and route dropped .automation.md files through the same disabled-by-default review flow as file import.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",ulugbekna,2026-09-10T09:55:19Z,True
+335511,eeaa225d6680a03913cb80e8a6b976756b715e28,"automations: feat: organize automation template sections
+
+Keep built-in and plugin-provided templates available in separate collapsible sections, with defaults that adapt to whether saved automations exist.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",ulugbekna,2026-09-10T10:35:38Z,True
+335511,08cc2cd9a6849da398b4d9d4192eb05cab23d6ef,"automations: feat: track new plugin templates
+
+Persist the plugin templates last seen when the section is expanded, show an unread marker for newly added templates, and serialize portable schedules as local-time cron or explicit manual schedules.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",ulugbekna,2026-09-10T14:22:46Z,True
+335511,032d48523169d1c93779847a7c1c395b02b87180,"automations: polish: refine blueprint export and template layout
+
+Normalize exported filenames to one .automation.md suffix and align disclosure content beneath template section titles.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",ulugbekna,2026-09-10T16:45:20Z,True
+335511,57722b5c656b18925c618278f68303c66c4a52c2,"automations: fix: address blueprint review feedback
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: f1363f3b-bd40-48be-b723-6c11ea3e0f04",ulugbekna,2026-09-10T17:37:24Z,True
+335511,e3564b10e73dff7375e4041cecacef6677b8e88c,"automations: test: define fixture automation contributions
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+Copilot-Session: f1363f3b-bd40-48be-b723-6c11ea3e0f04",ulugbekna,2026-09-10T17:56:34Z,True
+335502,3c166068b5fbf7bbb67bf3eee672c1e350a1723a,"Remove temporary Show Session Archive Nudge debug command
+
+Removes the non-stable-only Developer: Show Session Archive Nudge
+command and all debug-only wiring it required in
+SessionArchiveNudgeService and SessionArchiveNudge (debugSession
+observable, showForTesting, isDebug bypasses of eligibility and
+telemetry). Normal merged-PR eligibility, default Mark as Done
+wording, telemetry, and once-per-user onboarding behavior are
+unchanged.
+
+Also removes the now-dead command registration gate in
+chat.contribution.ts and the accessibility help paragraph (and its
+test) that introduced the developer command.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",benibenj,2026-09-10T16:25:09Z,True
+335502,3689a46022aee63a170343027765d8d85cfdbf3b,"Remove unused ISessionArchiveNudgeService import in test
+
+Fixes the Compile & Hygiene failure: the import was only used by the
+developer-command test removed in the previous commit.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",benibenj,2026-09-10T17:42:40Z,True
+335487,3c2c5586816d707b6f93e7508bf31c9e3c181bb2,"Revert ""Browser: Remove duplicate border in Modern UI""",mrleemurray,2026-09-10T15:43:26Z,True
+335472,d044ec21dd143f26458691f906910bb5bfa456ac,"fix: avoid subscribing to untitled agent sessions
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",mcorbettbma,2026-09-10T14:05:02Z,True
+335463,8636f03e4edd46fbbd8303cd350c7952a39f2def,"Fix Browser editor border in Modern UI
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",mrleemurray,2026-09-10T12:26:58Z,True
+335463,2d173353d74b3a36faa003747e6726902cf754b2,"Preserve collapsed Browser dimensions
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",mrleemurray,2026-09-10T12:56:02Z,True
+335447,399ed2bc8902ae74ec461f8818cffe38ef71a15c,fileService: avoid tracing errors for missing resources in resolveAll,aeschli,2026-09-10T10:57:59Z,True
+335436,6d17d79351541448d1691a06e952bb7048983b5d,"chat: Fix question option contrast in Light+
+
+Let primary labels inherit the selected row foreground so focused selections use the active foreground token. Keep the hover background paired with list focus and add a regression test.
+
+Fixes #335429
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",mrleemurray,2026-09-10T10:01:06Z,True
+335419,0af44cb2d60a0e3e298d348282be47e54164763e,Initial plan,Copilot,2026-09-10T08:55:15Z,False
+335419,203ee7f4afc423540e9c7c9ff2999d85d55288ce,"Relocate restored webview resource roots after extension updates
+
+Co-authored-by: alexr00 <38270282+alexr00@users.noreply.github.com>",Copilot,2026-09-10T09:04:07Z,True
+335419,da9153c4f149bbef65cd58142c1f12519d479ac7,"Handle case-insensitive and missing extension locations on webview restore
+
+Co-authored-by: alexr00 <38270282+alexr00@users.noreply.github.com>",Copilot,2026-09-10T09:10:10Z,True
+335419,3cccb2bdf8eeea29bdc26164ee5faf906446f4b8,Attestation commit,alexr00,2026-09-10T10:58:47Z,False
+335415,183f20621235db253bac399c6b9e744c0fb006d3,"Preserve collapse state in the SCM Repositories view
+
+The Repositories view re-expanded a repository that has submodules every
+time the view became visible, so a collapsed parent repository could not
+be kept collapsed.
+
+Two things caused this:
+
+- The tree input was always set with the view state that was read from
+  storage once in `renderBody`. That state is only written on
+  `onWillSaveState`, so any expand/collapse done in the meantime was
+  discarded when the view became visible again. Capture the current view
+  state when the view is hidden and use it on the next show instead.
+- When the view became visible, all known repositories were re-registered
+  through `onDidAddRepository`, and for a repository with a `parentId`
+  that unconditionally expanded the parent. Only expand the parent when it
+  actually gains its first child repository.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>",JulianHock,2026-09-10T08:38:23Z,True
+335415,fe7a9a35930db290b058faf8dc31f1eb8b31acd1,"Clarify tree view state refresh logic in comments
+
+Co-authored-by: Copilot Autofix powered by AI <175728472+Copilot@users.noreply.github.com>",JulianHock,2026-09-10T08:46:28Z,True
+335415,2c18ad843e866a1909a2f220572432327aa7bf6e,"Shorten inline comments to one line
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>",JulianHock,2026-09-10T08:52:49Z,True
+335410,71d0cdb7fd0d4e1b3ad3a8d17f16091bf38e97ad,"agentHost: avoid tracing missing customization roots
+
+Probe optional watcher roots with stat and ignore only missing paths so expected customization layouts do not flood agenthost.log. Preserve unexpected filesystem failures and add regression coverage.
+
+Fixes #335407
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",benibenj,2026-09-10T08:26:52Z,True
+335391,ef5f52cf76b93a606d2b9b074babf9612a66b122,"chat: expand customization migration assessment telemetry
+
+Report native, compatibility-mapped, and unsupported counts by target, customization type, and bounded source while preserving the existing migration hint behavior.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",digitarald,2026-09-10T04:23:42Z,True
+335391,aa3532ea9617839d20cb5e4c477efe5a7856cee8,"chat: simplify customization assessment telemetry
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",digitarald,2026-09-10T04:39:45Z,True
+335391,c6a6d629f9ab843d4bb3fa3ad938fb5b67a7f610,"chat: keep migration assessment telemetry private
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",digitarald,2026-09-10T04:55:44Z,True
+335391,82d60ae60a881e4eeec9277ef438089f7382600f,"chat: use logical provider for assessment target
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",digitarald,2026-09-10T05:15:14Z,True
+335391,f72afbb47a93e27100cd3d5607dc87c61460cea2,"chat: defer customization migration assessment
+
+Keep migration hint discovery gated by enabled categories, and collect the complete telemetry inventory asynchronously once per logical target and workspace context so chat request dispatch is not delayed.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",digitarald,2026-09-10T14:10:55Z,True
+335391,8d078b02ecf5804b7ea22e833aa6442537c03095,"chat: refresh migration assessment after changes
+
+Include the customization inventory generation in the assessment cache key so repeated chat turns reuse the snapshot while customization changes produce a fresh assessment.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",digitarald,2026-09-10T14:46:43Z,True
+335390,8996c34a2c020caab36bb6c1ea7a1d5f22ec6fbb,"mcp: await workspace .mcp.json discovery before autostart
+
+Register the initial workspace-root MCP scan as a lazy collection so the existing discovery barrier waits for it before selecting autostart candidates. Preserve eager scanning and add delayed-read coverage.\n\nFixes #335389\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",digitarald,2026-09-10T04:01:44Z,True
+335355,afa7805ce25f14e7110212ecd741be57cb99514b,"Move customization list scrollbar to pane edge
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",pwang347,2026-09-09T21:09:00Z,True
+335355,9476b42060412b265dd3f4d5658502d7ab2dcdea,"Refine customization scrollbar layout
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",pwang347,2026-09-10T18:06:11Z,True
+335355,fd798746c736629d98624f5a86fe573b7d0a8920,"Align migration scrollbar with pane edge
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",pwang347,2026-09-10T20:09:42Z,True
+335355,1a4510412fbd957dea4075156091bf86e7a575c9,"Exercise nested migration scrollbars
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",pwang347,2026-09-10T20:20:58Z,True
+335355,e84304a0e937c747760ffbb75142da761f7b04d6,"Polish customization scrollbar implementation
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",pwang347,2026-09-10T20:33:38Z,True
+335355,bd601daca7ac105be903b829ad8bb9b93984a634,"test: update customization screenshot hashes
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",pwang347,2026-09-10T21:43:06Z,True
+335355,784af5a4a71abb1951e362557046fff065ed2c02,"Fix clipped Extension Tools list
+
+Fixes #335508
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",pwang347,2026-09-10T22:02:10Z,True
+335355,7177aa0babc5ccff83420a7cf6412bf443dabbfd,"test: update Tools screenshot hashes
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",pwang347,2026-09-10T22:41:42Z,True
+335355,cef1a6f2d17b389e1f23c49762ae60eea9e1f28e,"Merge origin/main into customizations scrollbar fix
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",pwang347,2026-09-10T23:14:37Z,True
+335355,bf52326cbe5b3f232572c16189614b4e0ad52b03,"test: update merged customization screenshots
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",pwang347,2026-09-10T23:39:07Z,True
+335350,520621b9cebac84edf6a12ab172e18b4a40c3746,"Give WorkbenchButtonBar ownership of icon-label spacing
+
+WorkbenchButtonBar now owns the relationship between a leading
+icon/spinner and its label instead of splitting it across a child
+margin and, in some consumers, a parent gap:
+
+- The leading slot is sized from --vscode-iconSize-small (16px) and
+  carries zero margin of its own.
+- The button expresses the relationship as column-gap, defaulting to
+  the existing 4px appearance. An opt-in iconLabelSpacing: 'default'
+  variant uses 6px for buttons that want an existing wider visual
+  relationship.
+- The Changes view's primary labelled button migrates from a
+  distributed 2px container gap + 4px child margin (effectively 6px)
+  to a single 6px control-owned gap via iconLabelSpacing: 'default',
+  preserving its current appearance. Its diff-stat line counts keep
+  their own 2px gap, which was never part of this relationship.
+
+This is the first shared-control pilot for the predictable UI
+composition proposal, stacked on the authoring guidance in
+cherwan/ui-composition-authoring-guidance.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-09T20:45:56Z,True
+335350,01ea3b10216b72fbe157ec175ff19fe56da84ff2,"Keep button icon spacing pair-specific
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-09T23:23:33Z,True
+335350,165d63eaebcb78a8d6a44aad7741318487560c4c,"Align button fixtures with production
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-09T23:39:58Z,True
+335350,b6f5d20cc222b377c7373d581aa390e60ab62c71,"Keep button spacing change focused
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-09T23:55:06Z,True
+335350,0aa8d9dc99bdcb4a6ac2b93905d3aec09b2a74a2,"Fix Changes outside-card fixture to match production single-button geometry
+
+Both real call sites of the Changes-view outside-card action row
+(changesView.ts) pass renderSecondaryActions: false, which caps
+WorkbenchButtonBar at a single rendered action. The fixture was
+showing a second (View All Changes) icon-only button that production
+never renders, mis-stating the row's real geometry.
+
+Reduce the fixture to the single primary Commit button, pass
+renderSecondaryActions: false to match production options exactly,
+and update the expected visual description accordingly. The
+inline-icon-spacing regression this fixture previously also covered
+remains independently tested by the shared 'Icon and inline label
+icon' row in buttonBar.fixture.ts.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T01:31:02Z,True
+335350,2010482a42efa874c914e1eef9db4029c5cf93cb,"Assert computed leading-icon spacing and trim fixture comment
+
+- buttonbar.test.ts now imports buttonbar.css and mounts the button
+  bar in the live document with the spacing custom properties it
+  depends on, so the pair-specific spacing test asserts the actual
+  computed margin-inline-end instead of only DOM class/text shape.
+  Also adds a compact-spacing counterpart test.
+- changesButtonBar.fixture.ts: trims the explanatory comment to one
+  line, keeping the durable fixture invariant without restating
+  WorkbenchButtonBar.update's internal cap logic.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T02:08:56Z,True
+335350,55df7d9f9ca77ba443d841be45bda96c0d8b2743,"Thread iconLabelSpacing per host; trim test comment
+
+- changesView.ts: ChangesWorkbenchButtonBarWidget and
+  ChangesMenuWorkbenchButtonBarWidget hardcoded iconLabelSpacing to
+  'default'. Both widgets are shared between the outside-card
+  composition (ChangesViewPane.createActionsButtonBar) and the
+  single-pane editor header (ChangesActionsBar), so the header was
+  unintentionally widened from its existing compact 4px relationship
+  to 6px. iconLabelSpacing is now a constructor parameter: 'default'
+  for the outside-card view, 'compact' for the single-pane header.
+- buttonbar.test.ts: condensed the new computed-style assertion's
+  explanatory comment to one line, and the createButtonBar helper's
+  setup comment likewise.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T02:19:48Z,True
+335350,dca9822d88c52226e1c994ff882520a492ad581c,"Share Changes button spacing by host
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T02:29:43Z,True
+335350,0b6b855e66debe9d3b1b5a54f24ef0cc4c3cc05e,"Make iconLabelSpacing an explicit host-supplied parameter
+
+The prior commit derived spacing from the container's CSS class list
+(container.classList.contains('outside-card')), which makes a layout
+policy decision by sniffing a class name meant for styling, not by an
+explicit contract between each call site and the widget. Restore an
+explicit iconLabelSpacing constructor parameter on both
+ChangesWorkbenchButtonBarWidget and ChangesMenuWorkbenchButtonBarWidget,
+matching the review's ask for ""a host-supplied option"": the single-pane
+header (ChangesActionsBar) passes 'compact', the outside-card view
+(ChangesViewPane.createActionsButtonBar) passes 'default', and the
+shared button-bar fixture does the same instead of re-deriving it from
+DOM state.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T02:33:09Z,True
+335350,4585cdef89d748b7cc6f0e16a30c2278692e63d2,"Share Changes spacing constants
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T02:36:01Z,True
+335350,50ad49ff33dfaa9df61b6f8625bc6210d7cff02e,"Route Changes button-bar spacing through a host-keyed helper
+
+Both production call sites and the fixture now call
+getChangesButtonBarIconLabelSpacing(host) with an explicit
+'header' | 'outside-card' host identifier, instead of importing
+raw spacing constants independently. This keeps the mapping in a
+single function both consumers invoke, per review feedback that
+the fixture's independent constant selection didn't structurally
+guard against a production call site drifting to the wrong host.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T02:48:08Z,True
+335350,8815db14b14dee37f449cec143b53b058076d506,"Derive Changes button-bar spacing from container composition
+
+Rather than each host explicitly passing 'compact' | 'default',
+ChangesWorkbenchButtonBarWidget / ChangesMenuWorkbenchButtonBarWidget
+now derive iconLabelSpacing from whether their own container carries
+the outside-card class already used by changesView.css to switch
+that same container's button styling. The fixture builds its markup
+with the same shared CHANGES_OUTSIDE_CARD_CLASS constant and derives
+spacing through the identical function, so a production call site
+that stops applying the class is now reflected in the fixture too,
+closing the coverage gap a prior explicit-parameter design left open.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T15:06:41Z,True
+335350,5e5dbcaa636c33a07a2840a746e768a57227a8c6,"Cover the compact spacing branch and correct outside-card doc comment
+
+- Add a unit suite for getChangesButtonBarIconLabelSpacing covering both
+  the default (outside-card) and compact (no outside-card class) branches,
+  closing the untested compact path Copilot flagged.
+- Correct the CHANGES_OUTSIDE_CARD_CLASS doc comment: it marks the
+  standard (non-single-pane) actions row rendered above the file-tree
+  card, not the single-pane editor's action row as previously stated;
+  the single-pane header intentionally stays compact and has no
+  outside-card container.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T15:19:30Z,True
+335350,4ee25fe175f7f984661662ad8c92dd8f8b49a86e,"Assert leading-slot icon geometry and condense spacing helper docs
+
+- Add computed-style width/height assertions to the shared-leading-slot
+  test, resolving --vscode-iconSize-small in the test container so a
+  token or selector regression breaking the advertised 16x16 slot for
+  either the icon or the replacement spinner is caught automatically.
+- Condense the CHANGES_OUTSIDE_CARD_CLASS and
+  getChangesButtonBarIconLabelSpacing doc comments to their durable
+  one-line contracts, removing host/fixture implementation detail that
+  would go stale as call sites change.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T15:32:20Z,True
+335350,bc6308a9f21be7c09bf039f0eeb08b43353ba042,"Trim geometry test comment to one line
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T15:44:06Z,True
+335350,629825a10ccbd6ee7caf2293b4f831211f5fd119,"Fix flaky sub-pixel margin comparison in inline-icon test
+
+CI's macOS / Browser lane has been failing this test across several
+recent commits with a sub-pixel mismatch (3.2px vs 3.1875px) between
+the inline icon's computed marginInlineStart and marginInlineEnd. Both
+values come from the same symmetric, font-metric-derived margin, and
+differ only by rendering-engine rounding, not by an actual asymmetry.
+Compare them numerically with a small tolerance instead of exact
+string equality so the test asserts symmetry without depending on
+sub-pixel rounding matching bit-for-bit across platforms.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T15:57:09Z,True
+335350,3138c9182cebe9a1f923e9726d1a601161f2205a,"Remove trailing spacing helper line
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T19:06:25Z,True
+335350,730f7e57f343fbdecc33487b1028213487532e31,"Trim inline icon test comment
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T20:49:17Z,True
+335350,33f3d8d0a5eba86b04e59e5ec80ef8d972d1943b,"Use production UI font in button fixtures
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T21:27:30Z,True
+335350,65b782e3eca7f6b87bdb82204dc7077d93011176,"Assert dropdown leading-slot spacing
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T23:59:07Z,True
+335350,24781a8cd12768ad1c0fea8fce20da2542828a38,"Preserve Changes inline icon spacing
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-11T00:16:57Z,True
+335350,a50248696be27eb603a9bb8646a8950c9e16dda8,"Preserve inline label segment boundaries
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-11T00:28:40Z,True
+335346,5eeb19e411cc408b5522159a40b09002e16390e6,"Document predictable UI composition
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-09T20:12:20Z,True
+335346,dcf74a59fd141f8fd44842fa168a585853d098bd,"Clarify UI guidance ownership
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-09T23:19:28Z,True
+335346,caa202fcfd1b57b0a9eac7958de5d6d4531fb894,"Qualify icon composition guidance
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-09T23:38:12Z,True
+335346,fa90003f98d3dbdba0be497f39f1e3c0b7fb703f,"Keep UI guidance changes scoped
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-09T23:53:56Z,True
+335346,f12ac81da5ca683539f90dfcdcab4f6db179108d,"Route Codicon role guidance
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T00:08:35Z,True
+335346,c93702002358648e4db0a70baa661c2964a26b63,"Clarify composition guidance boundaries
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T00:21:45Z,True
+335346,62adbf600c6a475b6fecd3b271e5d02817b9e786,"Frame composition ownership as heuristic
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T00:34:25Z,True
+335346,abde362a920cbd02c77a1488063b97947fc7d7c0,"Scope token source guidance
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T00:46:57Z,True
+335346,cdc902d85534189ed75fe47fad4f212f89c76b0a,"Mark composition heuristic as candidate and fix validator invocation
+
+- Label the design-philosophy 'one relationship, one owner' paragraph
+  as a candidate heuristic pending counterexample review, rather than
+  presenting it as settled canonical doctrine, per PR description.
+- Fix the design-token validator references in design-philosophy and
+  ux-css-layout to give an actionable command (npm run stylelint --
+  <path>), since the default run only reports suggestions under
+  src/vs/sessions.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T01:18:28Z,True
+335346,5215844cb0f956177616a31aec74681203b8716a,"Stop enumerating specific compact-icon exceptions
+
+agent and vm are both registered in codiconsLibrary.ts with *Compact
+variants (agentCompact, vmCompact), so listing them as exceptions
+without a compact glyph was wrong and reintroduced the kind of mutable,
+easily-stale icon inventory this PR is otherwise routing out of the
+skills. State the fallback rule generically instead: check
+codiconsLibrary.ts for a registered *Compact variant, and only keep
+the regular glyph when none exists.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T01:55:02Z,True
+335346,1c6011dc448967bc10bc4e55d16a9fc5a80c1317,"Scope size token source guidance
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T20:29:07Z,True
+335346,3db8f94601a5f33b6a577592cd07a9f281978852,"Narrow composition guidance to proven roles
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T22:49:12Z,True
+335346,cf2e4a7145f4653cc8a4dbd3c6cdeb6162561dbf,"Reduce guidance to the proven ownership heuristic
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T22:51:37Z,True
+335346,09699f88961879a517f03f645bf3f0dae058a8c6,"Document the neutral composition scales
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T23:17:15Z,True
+335346,b86b11044be51ea5a0e167cd9b9eeb02b8b6c345,"Align spacing guidance with the complete scale
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T23:28:47Z,True
+335346,b57a092bebc02449467046919b2bd10eeb459764,"Document standalone size token fallbacks
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T23:39:47Z,True
+335346,f813089ebd6b7e84ed832061a0835bafebbcce7b,"Qualify standalone ownership guidance
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T23:46:53Z,True
+335346,1da55d66af12beaac67fa348296a347b97748a03,"Route mutable spacing values to the registry
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T23:56:03Z,True
+335346,4bab6ee1c6e97a2d8ff57f711fe2b46d3d5fafad,"Align icon and validator guidance
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-11T00:08:20Z,True
+335345,5f20e659d51cfb97e5cd4a15c4f9a8ec5a42c0ab,"Add UI composition size tokens
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-09T20:09:23Z,True
+335345,04fe5571fccdbe2526eb94dea0a4e93462b50def,"Test complete spacing and icon size scales
+
+Replace the change-oriented composition token assertion with durable,
+family-level coverage for the complete spacing and icon size ramps.
+Keep the existing curated registration smoke test unchanged.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-09T20:56:08Z,True
+335345,fb9ad1dad8dc24a20e004f922ce2c35372aa523e,"Simplify size scale registry tests
+
+Keep the existing representative registration smoke test unchanged.
+Discover spacing and icon size families by registry prefix so each
+complete expected scale is declared only once.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-09T21:18:24Z,True
+335345,77d80dcb82818645cb455ef2dad0297bd9c27037,"Make size scale tests order-independent
+
+Compare complete registry families as keyed default-value snapshots so
+the tests cover membership and values without asserting declaration
+order.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-09T22:05:26Z,True
+335345,d7125b7c1a6fe2b7a4380f3099b71cd25967c1ca,"Include zero in the spacing snapping scale
+
+validateSpacingTokens declared its nearest-step scale starting at 1px,
+so subpixel values close to zero (e.g. 0.4px) could never snap to
+sizeNone: the smallest candidate was always 1px. Add 0 to
+SPACING_SCALE so near-zero values resolve to var(--vscode-spacing-sizeNone),
+while the existing tie-break (<=) still rounds an exact 0.5px tie up
+to 1px as documented.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T01:46:43Z,True
+335345,5275e7cf5ce3ed85fb15be8c5666754c4fba210b,"Keep candidate icon size descriptions neutral
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T20:28:40Z,True
+335345,5bafbc2f36b92daf109ccea5c02f1bf1dceaad59,"Narrow size tokens to the active pilot
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T22:47:33Z,True
+335345,a59a43386d8328c6ef45ce7fe0ef1623c45761e2,"Restore the established icon size scale
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T23:15:31Z,True
+335345,34e8c479c71830322cd34ab9833529702d23bd6c,"Restore the complete composition token foundation
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chryw,2026-09-10T23:16:28Z,True
+335303,162834ca8c2a5ec3355a42aef108a1f4c1e0dbcb,"Merge origin/main into Dev Container menu
+
+Align the sandbox picker test with the removal of the redundant Dev Container checkbox.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chrmarti,2026-09-10T12:37:17Z,True
+335303,5042d80997e199e4c5dadfbeb552617f625bba2c,"sessions: resolve Dev Container capability across providers
+
+Allow a workspace row with a historical non-Agent-Host provider to use a capable Agent Host provider for Dev Container availability checks.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>",chrmarti,2026-09-10T12:40:59Z,True

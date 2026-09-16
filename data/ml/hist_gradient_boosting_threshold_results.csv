@@ -1,0 +1,2 @@
+model,threshold,validation_f1,validation_precision,validation_recall,test_accuracy,test_precision,test_recall,test_f1,test_roc_auc,tn,fp,fn,tp
+HistGradientBoosting - threshold tuned,0.1,0.6222222222222222,0.5575221238938053,0.7039106145251397,0.8021978021978022,0.40437158469945356,0.6788990825688074,0.5068493150684932,0.8428806450178595,510,109,35,74
