@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, EmailStr
 from sqlalchemy.orm import Session
 
 from scripts.predict_pr import predict_pr
+from scripts.predict_health import predict_health
 
 from backend.database import get_db
 from backend.auth import create_user, verify_password
@@ -22,6 +23,10 @@ from backend.graph_api import router as graph_routers
 # =========================================================
 # PYDANTIC MODELS
 # =========================================================
+
+# ============================================================
+# BOTTLENECK PREDICTION MODELS
+# ============================================================
 
 class Evidence(BaseModel):
     feature: str
@@ -112,6 +117,27 @@ class AnalysisResponse(BaseModel):
 # =========================================================
 # FASTAPI APP
 # =========================================================
+# ============================================================
+# HEALTH FORECAST RESPONSE MODEL
+# ============================================================
+
+class HealthForecastResponse(BaseModel):
+    success: bool
+    date: Optional[str] = None
+    forecast: Optional[float] = None
+    forecast_unit: Optional[str] = None
+    current_open_pr_backlog: Optional[float] = None
+    current_open_issue_backlog: Optional[float] = None
+    model: Optional[str] = None
+    alpha: Optional[float] = None
+    feature_count: Optional[int] = None
+    features: List[str] = Field(default_factory=list)
+    error: Optional[str] = None
+
+
+# ============================================================
+# FASTAPI APP
+# ============================================================
 
 app = FastAPI(
     title="RepoRescue API",
@@ -147,6 +173,9 @@ app.include_router(graph_routers)
 # =========================================================
 # ROOT
 # =========================================================
+# ============================================================
+# ROOT
+# ============================================================
 
 @app.get("/")
 def root():
@@ -523,6 +552,9 @@ def get_analysis_history(
 # DIRECT ML PREDICTION
 # JWT PROTECTED
 # =========================================================
+# ============================================================
+# BOTTLENECK PREDICTION
+# ============================================================
 
 @app.get(
     "/predict/{pr_number}",
@@ -538,5 +570,20 @@ def predict_pull_request(
 
     if not result["success"]:
         result["pr_number"] = pr_number
+
+    return result
+
+
+# ============================================================
+# REPOSITORY HEALTH FORECAST
+# ============================================================
+
+@app.get(
+    "/health-forecast",
+    response_model=HealthForecastResponse
+)
+def repository_health_forecast():
+
+    result = predict_health()
 
     return result
