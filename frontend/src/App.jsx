@@ -1,107 +1,140 @@
-
 import { useEffect, useState } from "react";
 import Login from "./login";
 import Signup from "./signup";
 import "./App.css";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = "http://127.0.0.1:8001";
 
 function App() {
-  const [page, setPage] = useState("login");
+  const [page, setPage] = useState(
+    localStorage.getItem("access_token") ? "dashboard" : "login"
+  );
 
   const [userId, setUserId] = useState(
     localStorage.getItem("user_id") || ""
   );
+
   const [username, setUsername] = useState(
     localStorage.getItem("username") || ""
   );
+
+  const [email, setEmail] = useState(
+    localStorage.getItem("email") || ""
+  );
+
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const [repoName, setRepoName] = useState("");
   const [repoUrl, setRepoUrl] = useState("");
   const [repositoryId, setRepositoryId] = useState(null);
 
+  const [githubRepos, setGithubRepos] = useState([]);
+  const [githubConnected, setGithubConnected] = useState(false);
+  const [selectedGithubRepo, setSelectedGithubRepo] = useState(null);
+  const [githubLoading, setGithubLoading] = useState(false);
+
   const [prNumber, setPrNumber] = useState("");
   const [analysisResult, setAnalysisResult] = useState(null);
   const [history, setHistory] = useState([]);
 
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  // Graph & Temporal states
   const [graphData, setGraphData] = useState({
     temporal: [],
     knowledge: [],
     impact: [],
     whatIf: [],
-  });
-
-  const [graphTotals, setGraphTotals] = useState({
-    temporal: 0,
-    knowledge: 0,
-    impact: 0,
-    whatIf: 0,
+    developerFile: [],
+    nodes: [],
+    edges: [],
   });
 
   const [graphLoading, setGraphLoading] = useState(false);
   const [graphMessage, setGraphMessage] = useState("");
 
-  const getToken = () => localStorage.getItem("access_token");
-
-  const authHeaders = () => ({
-    Authorization: `Bearer ${getToken()}`,
+  const [settings, setSettings] = useState({
+    notifications: true,
+    compactMode: false,
   });
 
-  // Load user's first repository after dashboard opens
-  useEffect(() => {
-    if (page === "dashboard" && userId) {
-      loadRepository();
-    }
-  }, [page, userId]);
-
-  const loadRepository = async () => {
-    try {
-      const response = await fetch(
-        `${API_BASE}/repositories/${userId}`,
-        {
-          headers: authHeaders(),
-        }
-      );
-
-      if (!response.ok) return;
-
-      const data = await response.json();
-
-      if (data.repositories && data.repositories.length > 0) {
-        const repo = data.repositories[0];
-
-        setRepositoryId(repo.repository_id);
-        setRepoName(repo.name);
-        setRepoUrl(repo.github_url);
-      }
-    } catch (error) {
-      console.error("Repository loading error:", error);
-    }
+  const getToken = () => {
+    return localStorage.getItem("access_token");
   };
 
-  const handleLoginSuccess = (data) => {
-  
-    localStorage.setItem("access_token", data.access_token);
-    localStorage.setItem("user_id", data.user_id);
-    localStorage.setItem("username", data.username);
-    localStorage.setItem("email", data.email);
+  const authHeaders = () => {
+    const token = getToken();
 
-    setUserId(data.user_id);
-    setUsername(data.username);
+    return {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+  };
+
+  const apiRequest = async (url, options = {}) => {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...authHeaders(),
+        ...(options.headers || {}),
+      },
+    });
+
+    let data = {};
+
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail ||
+          data.message ||
+          "Request failed"
+      );
+    }
+
+    return data;
+  };
+
+  // =========================
+  // LOGIN
+  // =========================
+
+  const handleLoginSuccess = (data) => {
+    localStorage.setItem(
+      "access_token",
+      data.access_token
+    );
+
+    localStorage.setItem(
+      "user_id",
+      String(data.user_id)
+    );
+
+    localStorage.setItem(
+      "username",
+      data.username || ""
+    );
+
+    localStorage.setItem(
+      "email",
+      data.email || ""
+    );
+
+    setUserId(String(data.user_id));
+    setUsername(data.username || "");
+    setEmail(data.email || "");
+
     setPage("dashboard");
     setMessage("");
   };
 
-  const handleSignupSuccess = () => {
-    setPage("login");
-    setMessage("Signup successful! Please login.");
-  };
+  // =========================
+  // LOGOUT
+  // =========================
 
-  const handleLogout = () => {
+  const logout = () => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("user_id");
     localStorage.removeItem("username");
@@ -109,317 +142,763 @@ function App() {
 
     setUserId("");
     setUsername("");
+    setEmail("");
+
     setRepositoryId(null);
     setRepoName("");
     setRepoUrl("");
+
+    setGithubRepos([]);
+    setGithubConnected(false);
+    setSelectedGithubRepo(null);
+
     setAnalysisResult(null);
     setHistory([]);
 
-    setGraphData({
-      temporal: [],
-      knowledge: [],
-      impact: [],
-      whatIf: [],
-    });
-
     setPage("login");
+    setMessage("");
   };
+
+  // =========================
+  // LOAD USER REPOSITORY
+  // =========================
+
+  const loadRepository = async () => {
+    if (!userId || !getToken()) {
+      return;
+    }
+
+    try {
+      const data = await apiRequest(
+        `${API_BASE}/repositories/${userId}`
+      );
+
+      if (
+        data.repositories &&
+        data.repositories.length > 0
+      ) {
+        const repo = data.repositories[0];
+
+        setRepositoryId(repo.repository_id);
+        setRepoName(repo.name || "");
+        setRepoUrl(repo.github_url || "");
+      }
+    } catch (error) {
+      console.error(
+        "Repository loading error:",
+        error
+      );
+    }
+  };
+
+  // =========================
+  // MANUAL REPOSITORY
+  // =========================
 
   const addRepository = async () => {
     if (!repoName || !repoUrl) {
-      setMessage("Please enter repository name and GitHub URL.");
+      setMessage(
+        "Please enter repository name and GitHub URL."
+      );
       return;
     }
 
-    setLoading(true);
-    setMessage("");
+    if (!userId) {
+      setMessage("Please login first.");
+      return;
+    }
 
     try {
-      const response = await fetch(`${API_BASE}/repositories`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders(),
-        },
-        body: JSON.stringify({
-          name: repoName,
-          github_url: repoUrl,
-          user_id: Number(userId),
-        }),
-      });
+      setLoading(true);
+      setMessage("");
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Failed to add repository");
-      }
-
-      setRepositoryId(data.repository_id);
-      setRepoName(data.name);
-      setRepoUrl(data.github_url);
-
-      setMessage("Repository connected successfully.");
-    } catch (error) {
-      setMessage(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const analyzePR = async () => {
-    if (!repositoryId) {
-      setMessage("Please connect a repository first.");
-      return;
-    }
-
-    if (!prNumber) {
-      setMessage("Please enter a PR number.");
-      return;
-    }
-
-    setLoading(true);
-    setMessage("");
-    setAnalysisResult(null);
-
-    try {
-      const response = await fetch(
-        `${API_BASE}/repositories/${repositoryId}/analyze/${prNumber}`,
+      const data = await apiRequest(
+        `${API_BASE}/repositories`,
         {
           method: "POST",
-          headers: authHeaders(),
+          body: JSON.stringify({
+            name: repoName,
+            github_url: repoUrl,
+            user_id: Number(userId),
+          }),
         }
       );
 
-      const data = await response.json();
+      if (data.repository) {
+        setRepositoryId(
+          data.repository.repository_id ||
+            data.repository.id
+        );
 
-      if (!response.ok) {
-        throw new Error(data.detail || "Prediction failed");
+        setRepoName(
+          data.repository.name || repoName
+        );
+
+        setRepoUrl(
+          data.repository.github_url || repoUrl
+        );
       }
 
-      setAnalysisResult(data);
-      setMessage("PR analysis completed successfully.");
-
-      loadHistory();
+      setMessage(
+        "Repository connected successfully."
+      );
     } catch (error) {
-      setMessage(error.message);
+      console.error(
+        "Repository connection error:",
+        error
+      );
+
+      setMessage(
+        error.message ||
+          "Unable to connect repository."
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const loadHistory = async () => {
-    if (!repositoryId) return;
+  // =========================
+  // GITHUB CONNECT
+  // =========================
 
+  const connectGitHub = () => {
+    const token = getToken();
+
+    if (!token) {
+      setMessage("Please login first.");
+      return;
+    }
+
+    setGithubLoading(true);
+
+    window.location.href =
+      `${API_BASE}/auth/github/login?token=${encodeURIComponent(
+        token
+      )}`;
+  };
+
+  // =========================
+  // LOAD GITHUB REPOSITORIES
+  // =========================
+
+  const loadGithubRepositories = async () => {
     try {
-      const response = await fetch(
-        `${API_BASE}/repositories/${repositoryId}/analyses`,
-        {
-          headers: authHeaders(),
-        }
+      setGithubLoading(true);
+      setMessage("");
+
+      const data = await apiRequest(
+        `${API_BASE}/auth/github/repositories`
       );
 
-      if (!response.ok) return;
+      setGithubRepos(
+        data.repositories || []
+      );
 
-      const data = await response.json();
-      setHistory(data.analyses || []);
+      setGithubConnected(
+        data.github_connected === true
+      );
     } catch (error) {
-      console.error("History error:", error);
+      console.error(
+        "GitHub repositories error:",
+        error
+      );
+
+      setGithubConnected(false);
+
+      setMessage(
+        error.message ||
+          "Unable to load GitHub repositories."
+      );
+    } finally {
+      setGithubLoading(false);
     }
   };
 
-  // ============================
-  // GRAPH & TEMPORAL INTEGRATION
-  // ============================
+  // =========================
+  // SELECT GITHUB REPOSITORY
+  // =========================
 
-  const loadGraphData = async () => {
-    setGraphLoading(true);
-    setGraphMessage("");
+  const selectGithubRepository = async (
+    githubRepoId
+  ) => {
+    if (!githubRepoId) {
+      setMessage(
+        "Please select a GitHub repository."
+      );
+      return;
+    }
 
     try {
-      const endpoints = [
-        `${API_BASE}/graph/temporal`,
-        `${API_BASE}/graph/knowledge-concentration?limit=50&offset=0`,
-        `${API_BASE}/graph/impact?limit=50&offset=0`,
-        `${API_BASE}/graph/what-if`,
-      ];
+      setGithubLoading(true);
+      setMessage("");
 
-      const responses = await Promise.all(
-        endpoints.map((url) =>
-          fetch(url, {
-            headers: authHeaders(),
-          })
-        )
+      const data = await apiRequest(
+        `${API_BASE}/auth/github/select-repository?github_repo_id=${githubRepoId}`,
+        {
+          method: "POST",
+        }
       );
 
-      for (const response of responses) {
-        if (!response.ok) {
-          throw new Error("Failed to load graph analysis data.");
+      if (data.repository) {
+        setRepositoryId(
+          data.repository.id
+        );
+
+        setRepoName(
+          data.repository.name || ""
+        );
+
+        setRepoUrl(
+          data.repository.github_url || ""
+        );
+
+        setSelectedGithubRepo(
+          data.repository
+        );
+      }
+
+      setMessage(
+        "GitHub repository selected successfully."
+      );
+    } catch (error) {
+      console.error(
+        "Repository selection error:",
+        error
+      );
+
+      setMessage(
+        error.message ||
+          "Unable to select repository."
+      );
+    } finally {
+      setGithubLoading(false);
+    }
+  };
+
+  // =========================
+  // PR ANALYSIS
+  // =========================
+
+  const analyzePR = async () => {
+    if (!prNumber) {
+      setMessage(
+        "Please enter a PR number."
+      );
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setMessage("");
+      setAnalysisResult(null);
+
+      if (!repositoryId) {
+        setMessage("Please connect a repository first.");
+        return;
+      }
+
+      const data = await apiRequest(
+        `${API_BASE}/repositories/${repositoryId}/analyze/${prNumber}`,
+        {
+          method: "POST"
+        }
+      );
+
+      setAnalysisResult(data);
+
+      setMessage(
+        "PR analysis completed successfully."
+      );
+
+      // Wait for state/repository to be available
+      if (repositoryId) {
+        await loadHistory();
+      }
+    } catch (error) {
+      console.error(
+        "Prediction error:",
+        error
+      );
+
+      setMessage(
+        error.message ||
+          "Unable to analyze PR."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // =========================
+  // ANALYSIS HISTORY
+  // =========================
+
+  const loadHistory = async () => {
+    if (!repositoryId) {
+      console.log(
+        "History skipped: repositoryId missing"
+      );
+      return;
+    }
+
+    try {
+      console.log(
+        "Loading analysis history for repository:",
+        repositoryId
+      );
+
+      const data = await apiRequest(
+        `${API_BASE}/repositories/${repositoryId}/analyses`
+      );
+
+      console.log(
+        "Analysis history API response:",
+        data
+      );
+
+      /*
+        Backend may return:
+        {
+          history: [...]
+        }
+
+        OR
+
+        {
+          analyses: [...]
+        }
+
+        OR
+
+        {
+          data: [...]
+        }
+      */
+
+      let historyData = [];
+
+      if (Array.isArray(data)) {
+        historyData = data;
+      } else if (
+        Array.isArray(data.history)
+      ) {
+        historyData = data.history;
+      } else if (
+        Array.isArray(data.analyses)
+      ) {
+        historyData = data.analyses;
+      } else if (
+        Array.isArray(data.data)
+      ) {
+        historyData = data.data;
+      }
+
+      console.log(
+        "Processed history:",
+        historyData
+      );
+
+      setHistory(historyData);
+    } catch (error) {
+      console.error(
+        "History loading error:",
+        error
+      );
+
+      setHistory([]);
+
+      setMessage(
+        error.message ||
+          "Unable to load analysis history."
+      );
+    }
+  };
+
+  // =========================
+  // GRAPH DATA
+  // =========================
+
+  const loadGraphData = async () => {
+    try {
+      setGraphLoading(true);
+      setGraphMessage("");
+
+      const endpoints = {
+        temporal: "/graph/temporal",
+        knowledge:
+          "/graph/knowledge-concentration",
+        impact: "/graph/impact",
+        whatIf: "/graph/what-if",
+        developerFile:
+          "/graph/developer-file",
+        nodes: "/graph/nodes",
+        edges: "/graph/edges",
+      };
+
+      const results = {};
+
+      for (
+        const [key, endpoint] of Object.entries(
+          endpoints
+        )
+      ) {
+        try {
+          const data = await apiRequest(
+            `${API_BASE}${endpoint}`
+          );
+
+          results[key] =
+            data.data ||
+            data.results ||
+            data.nodes ||
+            data.edges ||
+            data;
+        } catch (error) {
+          console.error(
+            `${key} graph error:`,
+            error
+          );
+
+          results[key] = [];
         }
       }
 
-      const [
-        temporalResponse,
-        knowledgeResponse,
-        impactResponse,
-        whatIfResponse,
-      ] = responses;
-
-      const temporal = await temporalResponse.json();
-      const knowledge = await knowledgeResponse.json();
-      const impact = await impactResponse.json();
-      const whatIf = await whatIfResponse.json();
-
       setGraphData({
-        temporal: temporal.data || [],
-        knowledge: knowledge.data || [],
-        impact: impact.data || [],
-        whatIf: whatIf.data || [],
-      });
-
-      setGraphTotals({
-        temporal: temporal.total_records || 0,
-        knowledge: knowledge.total_records || 0,
-        impact: impact.total_records || 0,
-        whatIf: whatIf.total_records || 0,
+        temporal: results.temporal || [],
+        knowledge: results.knowledge || [],
+        impact: results.impact || [],
+        whatIf: results.whatIf || [],
+        developerFile:
+          results.developerFile || [],
+        nodes: results.nodes || [],
+        edges: results.edges || [],
       });
 
       setGraphMessage(
-        "Graph & Temporal analysis loaded successfully."
+        "Graph analysis loaded."
       );
     } catch (error) {
-      setGraphMessage(error.message);
+      console.error(
+        "Graph loading error:",
+        error
+      );
+
+      setGraphMessage(
+        "Unable to load graph analysis."
+      );
     } finally {
       setGraphLoading(false);
     }
   };
 
-  const formatNumber = (value) => {
-    const number = Number(value);
+  // =========================
+  // GITHUB CALLBACK
+  // =========================
 
-    if (Number.isFinite(number)) {
-      return number.toLocaleString();
+  useEffect(() => {
+    const params =
+      new URLSearchParams(
+        window.location.search
+      );
+
+    const githubStatus =
+      params.get("github");
+
+    if (githubStatus === "connected") {
+      setPage("dashboard");
+
+      setMessage(
+        "GitHub connected successfully."
+      );
+
+      window.history.replaceState(
+        {},
+        document.title,
+        window.location.pathname
+      );
+
+      loadGithubRepositories();
     }
+  }, []);
 
-    return value ?? "N/A";
+  // =========================
+  // LOAD REPOSITORY
+  // =========================
+
+  useEffect(() => {
+    if (
+      page === "dashboard" &&
+      userId
+    ) {
+      loadRepository();
+    }
+  }, [page, userId]);
+
+  // =========================
+  // LOAD HISTORY WHEN REPO ID CHANGES
+  // =========================
+
+  useEffect(() => {
+    if (repositoryId) {
+      loadHistory();
+    }
+  }, [repositoryId]);
+
+  // =========================
+  // SETTINGS
+  // =========================
+
+  const toggleNotifications = () => {
+    setSettings(
+      (previous) => ({
+        ...previous,
+        notifications:
+          !previous.notifications,
+      })
+    );
   };
 
-  const formatPercent = (value) => {
-    const number = Number(value);
-
-    if (Number.isFinite(number)) {
-      return `${(number * 100).toFixed(2)}%`;
-    }
-
-    return "N/A";
+  const toggleCompactMode = () => {
+    setSettings(
+      (previous) => ({
+        ...previous,
+        compactMode:
+          !previous.compactMode,
+      })
+    );
   };
 
-  const sortedKnowledge = [...graphData.knowledge]
-    .sort(
-      (a, b) =>
-        Number(b.dominant_developer_share || 0) -
-        Number(a.dominant_developer_share || 0)
-    )
-    .slice(0, 10);
-
-  const sortedImpact = [...graphData.impact]
-    .sort(
-      (a, b) =>
-        Number(b.impact_weight || 0) -
-        Number(a.impact_weight || 0)
-    )
-    .slice(0, 10);
-
-  const sortedWhatIf = [...graphData.whatIf]
-    .sort(
-      (a, b) =>
-        Number(b.files_with_no_remaining_contributor || 0) -
-        Number(a.files_with_no_remaining_contributor || 0)
-    )
-    .slice(0, 10);
-
-  // ============================
-  // LOGIN
-  // ============================
+  // =========================
+  // LOGIN PAGE
+  // =========================
 
   if (page === "login") {
     return (
       <Login
-        onLoginSuccess={handleLoginSuccess}
-        onSignup={() => setPage("signup")}
-        message={message}
+        onLoginSuccess={
+          handleLoginSuccess
+        }
+        onSignup={() =>
+          setPage("signup")
+        }
       />
     );
   }
 
-  // ============================
-  // SIGNUP
-  // ============================
+  // =========================
+  // SIGNUP PAGE
+  // =========================
 
   if (page === "signup") {
     return (
       <Signup
-        onSignupSuccess={handleSignupSuccess}
-        onLogin={() => setPage("login")}
+        onSignupSuccess={() =>
+          setPage("login")
+        }
+        onLogin={() =>
+          setPage("login")
+        }
       />
     );
   }
 
-  // ============================
-  // DASHBOARD
-  // ============================
+  // =========================
+  // SETTINGS PAGE
+  // =========================
 
-  return (
-    <div className="dashboard">
+  if (page === "settings") {
+    return (
+      <div className="app-container">
 
-      {/* NAVBAR */}
+        <header className="header">
 
-      <nav className="navbar">
-        <div className="logo">
-          RepoRescue
-        </div>
+          <div>
+            <h1>
+              ⚙️ RepoRescue Settings
+            </h1>
 
-        <div className="nav-links">
-          <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
-            Dashboard
-          </button>
-
-          <button
-            onClick={() =>
-              document
-                .getElementById("graph-analysis")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }
-          >
-            Graph Analysis
-          </button>
+            <p>
+              Manage your RepoRescue
+              preferences.
+            </p>
+          </div>
 
           <button
+            className="button"
             onClick={() =>
-              document
-                .getElementById("history")
-                ?.scrollIntoView({ behavior: "smooth" })
+              setPage("dashboard")
             }
           >
-            History
+            ← Dashboard
           </button>
 
-          <button onClick={handleLogout}>
+        </header>
+
+        <section className="card">
+
+          <h2>Account</h2>
+
+          <p>
+            <strong>
+              Username:
+            </strong>{" "}
+            {username ||
+              "Not available"}
+          </p>
+
+          <p>
+            <strong>
+              Email:
+            </strong>{" "}
+            {email ||
+              "Not available"}
+          </p>
+
+          <p>
+            <strong>
+              User ID:
+            </strong>{" "}
+            {userId ||
+              "Not available"}
+          </p>
+
+        </section>
+
+        <section className="card">
+
+          <h2>Preferences</h2>
+
+          <label className="setting-row">
+
+            <span>
+              Enable notifications
+            </span>
+
+            <input
+              type="checkbox"
+              checked={
+                settings.notifications
+              }
+              onChange={
+                toggleNotifications
+              }
+            />
+
+          </label>
+
+          <label className="setting-row">
+
+            <span>
+              Compact dashboard
+            </span>
+
+            <input
+              type="checkbox"
+              checked={
+                settings.compactMode
+              }
+              onChange={
+                toggleCompactMode
+              }
+            />
+
+          </label>
+
+        </section>
+
+        <section className="card">
+
+          <h2>Privacy</h2>
+
+          <p>
+            Repository analysis is
+            associated with your
+            authenticated RepoRescue
+            account.
+          </p>
+
+          <p>
+            Repository access is
+            controlled through your
+            connected GitHub account.
+          </p>
+
+        </section>
+
+        <section className="card">
+
+          <h2>Session</h2>
+
+          <button
+            className="button danger"
+            onClick={logout}
+          >
             Logout
           </button>
-        </div>
-      </nav>
 
-      {/* HEADER */}
+        </section>
 
-      <div className="dashboard-header">
-        <h1>Welcome, {username} 👋</h1>
-
-        <p>
-          AI-powered predictive software maintenance platform
-        </p>
       </div>
+    );
+  }
 
-      {/* MESSAGE */}
+  // =========================
+  // DASHBOARD
+  // =========================
+
+  return (
+    <div
+      className={
+        settings.compactMode
+          ? "app-container compact-mode"
+          : "app-container"
+      }
+    >
+
+      <header className="header">
+
+        <div>
+
+          <h1>
+            🚨 RepoRescue
+          </h1>
+
+          <p>
+            Repository Risk &
+            Developer Bottleneck
+            Analysis
+          </p>
+
+        </div>
+
+        <div className="header-actions">
+
+          <span>
+            Welcome,{" "}
+            <strong>
+              {username || "User"}
+            </strong>
+          </span>
+
+          <button
+            className="button"
+            onClick={() =>
+              setPage("settings")
+            }
+          >
+            ⚙️ Settings
+          </button>
+
+          <button
+            className="button danger"
+            onClick={logout}
+          >
+            Logout
+          </button>
+
+        </div>
+
+      </header>
 
       {message && (
         <div className="message">
@@ -427,23 +906,129 @@ function App() {
         </div>
       )}
 
-      {/* REPOSITORY */}
+      {/* =========================
+          GITHUB
+      ========================= */}
 
       <section className="card">
-        <h2>🔗 Connect GitHub Repository</h2>
+
+        <h2>
+          🔗 Connect GitHub
+        </h2>
+
+        <p>
+          Connect your GitHub account
+          to view repositories you are
+          authorized to access.
+        </p>
+
+        <button
+          className="button"
+          onClick={connectGitHub}
+          disabled={githubLoading}
+        >
+          {githubLoading
+            ? "Connecting..."
+            : githubConnected
+            ? "GitHub Connected"
+            : "Connect GitHub"}
+        </button>
+
+        {githubConnected && (
+          <button
+            className="button secondary"
+            onClick={
+              loadGithubRepositories
+            }
+            disabled={githubLoading}
+          >
+            🔄 Load Repositories
+          </button>
+        )}
+
+        {githubRepos.length > 0 && (
+          <div className="repo-list">
+
+            <h3>
+              Authorized GitHub
+              Repositories
+            </h3>
+
+            {githubRepos.map(
+              (repo) => (
+                <div
+                  className="repo-item"
+                  key={repo.id}
+                >
+
+                  <div>
+
+                    <strong>
+                      {repo.full_name ||
+                        repo.name}
+                    </strong>
+
+                    <p>
+                      {repo.private
+                        ? "🔒 Private"
+                        : "🌐 Public"}
+                    </p>
+
+                  </div>
+
+                  <button
+                    className="button"
+                    onClick={() =>
+                      selectGithubRepository(
+                        repo.id
+                      )
+                    }
+                    disabled={
+                      githubLoading
+                    }
+                  >
+                    Select
+                  </button>
+
+                </div>
+              )
+            )}
+
+          </div>
+        )}
+
+      </section>
+
+      {/* =========================
+          REPOSITORY
+      ========================= */}
+
+      <section className="card">
+
+        <h2>
+          📁 Repository
+        </h2>
 
         <input
           type="text"
           placeholder="Repository name"
           value={repoName}
-          onChange={(e) => setRepoName(e.target.value)}
+          onChange={(e) =>
+            setRepoName(
+              e.target.value
+            )
+          }
         />
 
         <input
           type="text"
           placeholder="GitHub repository URL"
           value={repoUrl}
-          onChange={(e) => setRepoUrl(e.target.value)}
+          onChange={(e) =>
+            setRepoUrl(
+              e.target.value
+            )
+          }
         />
 
         <button
@@ -451,35 +1036,63 @@ function App() {
           onClick={addRepository}
           disabled={loading}
         >
-          {loading ? "Connecting..." : "Connect Repository"}
+          {loading
+            ? "Connecting..."
+            : "Connect Repository"}
         </button>
 
         {repositoryId && (
           <div className="repo-info">
-            <h3>Connected Repository</h3>
+
+            <h3>
+              ✅ Connected Repository
+            </h3>
+
             <p>
-              <strong>Name:</strong> {repoName}
+              <strong>
+                Name:
+              </strong>{" "}
+              {repoName}
             </p>
+
             <p>
-              <strong>URL:</strong> {repoUrl}
+              <strong>
+                URL:
+              </strong>{" "}
+              {repoUrl}
             </p>
+
             <p>
-              <strong>Repository ID:</strong> {repositoryId}
+              <strong>
+                Repository ID:
+              </strong>{" "}
+              {repositoryId}
             </p>
+
           </div>
         )}
+
       </section>
 
-      {/* PR ANALYSIS */}
+      {/* =========================
+          PR ANALYSIS
+      ========================= */}
 
       <section className="card">
-        <h2>🤖 Analyze Pull Request</h2>
+
+        <h2>
+          🤖 Pull Request Analysis
+        </h2>
 
         <input
           type="number"
           placeholder="Enter PR number"
           value={prNumber}
-          onChange={(e) => setPrNumber(e.target.value)}
+          onChange={(e) =>
+            setPrNumber(
+              e.target.value
+            )
+          }
         />
 
         <button
@@ -487,482 +1100,367 @@ function App() {
           onClick={analyzePR}
           disabled={loading}
         >
-          {loading ? "Analyzing..." : "Analyze PR"}
+          {loading
+            ? "Analyzing..."
+            : "Analyze PR"}
         </button>
-      </section>
 
-      {/* ANALYSIS RESULT */}
+        {analysisResult && (
+          <div className="analysis-result">
 
-      {analysisResult && (
-        <section className="card">
-          <h2>📊 Prediction Result</h2>
+            <h3>
+              📊 Prediction Result
+            </h3>
 
-          <div className="cards">
-
-            <div className="small-card">
-              <h3>PR Number</h3>
-              <p>{analysisResult.pr_number}</p>
-            </div>
-
-            <div className="small-card">
-              <h3>Probability</h3>
+            {analysisResult.probability !==
+              undefined && (
               <p>
+                <strong>
+                  Probability:
+                </strong>{" "}
                 {(
-                  Number(analysisResult.probability || 0) * 100
+                  Number(
+                    analysisResult.probability
+                  ) * 100
                 ).toFixed(2)}
                 %
               </p>
-            </div>
+            )}
 
-            <div className="small-card">
-              <h3>Prediction</h3>
-              <p>{analysisResult.prediction}</p>
-            </div>
+            {analysisResult.prediction && (
+              <p>
+                <strong>
+                  Prediction:
+                </strong>{" "}
+                {
+                  analysisResult.prediction
+                }
+              </p>
+            )}
 
-            <div className="small-card">
-              <h3>Threshold</h3>
-              <p>{analysisResult.threshold}</p>
-            </div>
+            {analysisResult.threshold !==
+              undefined && (
+              <p>
+                <strong>
+                  Threshold:
+                </strong>{" "}
+                {
+                  analysisResult.threshold
+                }
+              </p>
+            )}
 
-          </div>
+            {analysisResult.semantic_signal && (
+              <p>
+                <strong>
+                  Semantic Signal:
+                </strong>{" "}
+                {
+                  analysisResult.semantic_signal
+                }
+              </p>
+            )}
 
-          <div className="repo-info">
-            <p>
-              <strong>Semantic Signal:</strong>{" "}
-              {analysisResult.semantic_signal || "N/A"}
-            </p>
+            {analysisResult.semantic_strength !==
+              undefined && (
+              <p>
+                <strong>
+                  Semantic Strength:
+                </strong>{" "}
+                {Number(
+                  analysisResult.semantic_strength
+                ).toFixed(4)}
+              </p>
+            )}
 
-            <p>
-              <strong>Semantic Strength:</strong>{" "}
-              {analysisResult.semantic_strength ?? "N/A"}
-            </p>
-          </div>
-
-          {analysisResult.top_evidence &&
-            analysisResult.top_evidence.length > 0 && (
+            {analysisResult.top_evidence && (
               <div>
-                <h3>Top Evidence</h3>
 
-                <div style={{ overflowX: "auto" }}>
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Feature</th>
-                        <th>Description</th>
-                        <th>Contribution</th>
-                        <th>Direction</th>
-                        <th>Explanation</th>
-                      </tr>
-                    </thead>
+                <strong>
+                  Top Evidence:
+                </strong>
 
-                    <tbody>
-                      {analysisResult.top_evidence.map(
-                        (item, index) => (
-                          <tr key={index}>
-                            <td>{item.feature}</td>
-                            <td>{item.description}</td>
-                            <td>{item.contribution}</td>
-                            <td>{item.direction}</td>
-                            <td>{item.explanation}</td>
-                          </tr>
-                        )
+                <pre>
+                  {typeof analysisResult.top_evidence ===
+                  "string"
+                    ? analysisResult.top_evidence
+                    : JSON.stringify(
+                        analysisResult.top_evidence,
+                        null,
+                        2
                       )}
-                    </tbody>
-                  </table>
-                </div>
+                </pre>
+
               </div>
             )}
-        </section>
-      )}
 
-      {/* ============================
-          GRAPH & TEMPORAL ANALYSIS
-          ============================ */}
+          </div>
+        )}
 
-      <section
-        className="card"
-        id="graph-analysis"
-      >
-        <h2>🕸️ Graph & Temporal Analysis</h2>
+      </section>
 
-        <p>
-          Integrated outputs from Member 2's Graph and Temporal
-          Analysis pipeline.
-        </p>
+      {/* =========================
+          GRAPH ANALYSIS
+      ========================= */}
+
+      <section className="card">
+
+        <h2>
+          📈 Repository Intelligence
+        </h2>
 
         <button
           className="button"
-          onClick={loadGraphData}
+          onClick={
+            loadGraphData
+          }
           disabled={graphLoading}
         >
           {graphLoading
-            ? "Loading Analysis..."
-            : "Load Graph & Temporal Analysis"}
+            ? "Loading Graph Analysis..."
+            : "Load Graph Analysis"}
         </button>
 
         {graphMessage && (
-          <div className="message">
+          <p>
             {graphMessage}
+          </p>
+        )}
+
+        <div className="analysis-grid">
+
+          <div className="analysis-box">
+
+            <h3>
+              ⏱️ Temporal Analysis
+            </h3>
+
+            <p>
+              Records:{" "}
+              {Array.isArray(
+                graphData.temporal
+              )
+                ? graphData.temporal.length
+                : 0}
+            </p>
+
           </div>
-        )}
 
-        {graphTotals.temporal > 0 && (
-          <>
-            {/* SUMMARY */}
+          <div className="analysis-box">
 
-            <div className="cards">
+            <h3>
+              🧠 Knowledge Concentration
+            </h3>
 
-              <div className="small-card">
-                <h3>Temporal Records</h3>
-                <p>
-                  {formatNumber(graphTotals.temporal)}
-                </p>
-              </div>
+            <p>
+              Records:{" "}
+              {Array.isArray(
+                graphData.knowledge
+              )
+                ? graphData.knowledge.length
+                : 0}
+            </p>
 
-              <div className="small-card">
-                <h3>Knowledge Files</h3>
-                <p>
-                  {formatNumber(graphTotals.knowledge)}
-                </p>
-              </div>
+          </div>
 
-              <div className="small-card">
-                <h3>Impact Relations</h3>
-                <p>
-                  {formatNumber(graphTotals.impact)}
-                </p>
-              </div>
+          <div className="analysis-box">
 
-              <div className="small-card">
-                <h3>What-if Records</h3>
-                <p>
-                  {formatNumber(graphTotals.whatIf)}
-                </p>
-              </div>
+            <h3>
+              💥 Impact Analysis
+            </h3>
 
-            </div>
+            <p>
+              Records:{" "}
+              {Array.isArray(
+                graphData.impact
+              )
+                ? graphData.impact.length
+                : 0}
+            </p>
 
-            {/* TEMPORAL */}
+          </div>
 
-            <div className="graph-section">
-              <h3>📈 Temporal Analysis</h3>
+          <div className="analysis-box">
 
-              <p>
-                Weekly development activity from the historical
-                dataset.
-              </p>
+            <h3>
+              🔮 What-if Simulation
+            </h3>
 
-              <div style={{ overflowX: "auto" }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Week</th>
-                      <th>Commits / Week</th>
-                      <th>Active Developers</th>
-                      <th>PRs / Week</th>
-                      <th>PR Authors</th>
-                      <th>Files Changed</th>
-                    </tr>
-                  </thead>
+            <p>
+              Records:{" "}
+              {Array.isArray(
+                graphData.whatIf
+              )
+                ? graphData.whatIf.length
+                : 0}
+            </p>
 
-                  <tbody>
-                    {graphData.temporal.map(
-                      (row, index) => (
-                        <tr key={index}>
-                          <td>{row.week}</td>
-                          <td>
-                            {formatNumber(
-                              row.commits_per_week
-                            )}
-                          </td>
-                          <td>
-                            {formatNumber(
-                              row.active_developers
-                            )}
-                          </td>
-                          <td>
-                            {formatNumber(
-                              row.prs_per_week
-                            )}
-                          </td>
-                          <td>{row.pr_authors}</td>
-                          <td>
-                            {formatNumber(
-                              row.files_changed_per_week
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          </div>
 
-            {/* KNOWLEDGE CONCENTRATION */}
+          <div className="analysis-box">
 
-            <div className="graph-section">
-              <h3>👥 Knowledge Concentration</h3>
+            <h3>
+              👨‍💻 Developer–File Analysis
+            </h3>
 
-              <p>
-                Files with higher dominant developer share indicate
-                stronger historical concentration of contribution.
-              </p>
+            <p>
+              Records:{" "}
+              {Array.isArray(
+                graphData.developerFile
+              )
+                ? graphData.developerFile.length
+                : 0}
+            </p>
 
-              <div style={{ overflowX: "auto" }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>File</th>
-                      <th>Dominant Developer</th>
-                      <th>Developer Share</th>
-                      <th>Total Commits</th>
-                      <th>Unique Developers</th>
-                      <th>Concentration</th>
-                    </tr>
-                  </thead>
+          </div>
 
-                  <tbody>
-                    {sortedKnowledge.map(
-                      (row, index) => (
-                        <tr key={index}>
-                          <td>{row.file_name}</td>
-                          <td>
-                            {row.dominant_developer}
-                          </td>
-                          <td>
-                            {formatPercent(
-                              row.dominant_developer_share
-                            )}
-                          </td>
-                          <td>
-                            {formatNumber(
-                              row.total_file_commits
-                            )}
-                          </td>
-                          <td>
-                            {formatNumber(
-                              row.unique_developers_per_file
-                            )}
-                          </td>
-                          <td>
-                            {row.contributor_concentration ??
-                              "N/A"}
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          <div className="analysis-box">
 
-            {/* IMPACT ANALYSIS */}
+            <h3>
+              🔗 Repository Graph
+            </h3>
 
-            <div className="graph-section">
-              <h3>🔗 Historical File Impact</h3>
+            <p>
+              Nodes:{" "}
+              {Array.isArray(
+                graphData.nodes
+              )
+                ? graphData.nodes.length
+                : 0}
+            </p>
 
-              <p>
-                These relationships represent historical file
-                co-change frequency, not guaranteed source-code
-                dependency.
-              </p>
+            <p>
+              Edges:{" "}
+              {Array.isArray(
+                graphData.edges
+              )
+                ? graphData.edges.length
+                : 0}
+            </p>
 
-              <div style={{ overflowX: "auto" }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Source File</th>
-                      <th>Target File</th>
-                      <th>Co-change Frequency</th>
-                      <th>Impact Weight</th>
-                    </tr>
-                  </thead>
+          </div>
 
-                  <tbody>
-                    {sortedImpact.map(
-                      (row, index) => (
-                        <tr key={index}>
-                          <td>{row.source_file}</td>
-                          <td>{row.target_file}</td>
-                          <td>
-                            {formatNumber(
-                              row.cochange_frequency
-                            )}
-                          </td>
-                          <td>
-                            {row.impact_weight}
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+        </div>
 
-            {/* WHAT-IF */}
-
-            <div className="graph-section">
-              <h3>🔮 What-if Knowledge Loss Simulation</h3>
-
-              <p>
-                Simulation of the effect of removing the dominant
-                contributor from a file. This is a what-if analysis,
-                not a prediction that a developer will actually leave.
-              </p>
-
-              <div style={{ overflowX: "auto" }}>
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>File</th>
-                      <th>Dominant Developer</th>
-                      <th>Developer Share</th>
-                      <th>Total Commits</th>
-                      <th>Unique Developers</th>
-                      <th>Files Losing Contributor</th>
-                      <th>No Remaining Contributor</th>
-                      <th>High Concentration</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {sortedWhatIf.map(
-                      (row, index) => (
-                        <tr key={index}>
-                          <td>{row.file_name}</td>
-                          <td>
-                            {row.dominant_developer}
-                          </td>
-                          <td>
-                            {formatPercent(
-                              row.dominant_developer_share
-                            )}
-                          </td>
-                          <td>
-                            {formatNumber(row.total_commits)}
-                          </td>
-                          <td>
-                            {formatNumber(
-                              row.unique_developers
-                            )}
-                          </td>
-                          <td>
-                            {formatNumber(
-                              row.files_losing_dominant_contributor
-                            )}
-                          </td>
-                          <td>
-                            {formatNumber(
-                              row.files_with_no_remaining_contributor
-                            )}
-                          </td>
-                          <td>
-                            {String(
-                              row.high_concentration_flag
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* DATA LIMITATION */}
-
-            <div className="repo-info">
-              <strong>Data limitation:</strong>
-
-              <p>
-                The current graph CSV outputs do not contain a
-                repository identifier. Therefore these graph results
-                are not independently filterable by repository.
-              </p>
-            </div>
-          </>
-        )}
       </section>
 
-      {/* ============================
+      {/* =========================
           ANALYSIS HISTORY
-          ============================ */}
-
-      <section
-        className="card"
-        id="history"
-      >
-        <h2>📚 Analysis History</h2>
-
-        <button
-          className="button"
-          onClick={loadHistory}
-          disabled={!repositoryId}
-        >
-          Refresh History
-        </button>
-
-        {history.length === 0 ? (
-          <p>No analysis history available.</p>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>PR</th>
-                  <th>Probability</th>
-                  <th>Prediction</th>
-                  <th>Threshold</th>
-                  <th>Semantic Signal</th>
-                  <th>Created At</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {history.map((item) => (
-                  <tr key={item.analysis_id}>
-                    <td>{item.pr_number}</td>
-
-                    <td>
-                      {(
-                        Number(item.probability || 0) *
-                        100
-                      ).toFixed(2)}
-                      %
-                    </td>
-
-                    <td>{item.prediction}</td>
-
-                    <td>{item.threshold}</td>
-
-                    <td>
-                      {item.semantic_signal || "N/A"}
-                    </td>
-
-                    <td>{item.created_at}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {/* SETTINGS */}
+      ========================= */}
 
       <section className="card">
-        <h2>⚙️ Settings</h2>
+
+        <h2>
+          🕘 Analysis History
+        </h2>
+
+        {history.length === 0 ? (
+
+          <p>
+            No analysis history
+            available.
+          </p>
+
+        ) : (
+
+          <div className="history-list">
+
+            {history.map(
+              (item, index) => (
+
+                <div
+                  className="history-item"
+                  key={
+                    item.id ||
+                    item.analysis_id ||
+                    index
+                  }
+                >
+
+                  <p>
+                    <strong>
+                      PR:
+                    </strong>{" "}
+                    {item.pr_number ??
+                      item.prNumber ??
+                      "-"}
+                  </p>
+
+                  <p>
+                    <strong>
+                      Prediction:
+                    </strong>{" "}
+                    {item.prediction ||
+                      "-"}
+                  </p>
+
+                  {item.probability !==
+                    undefined && (
+                    <p>
+                      <strong>
+                        Probability:
+                      </strong>{" "}
+                      {(
+                        Number(
+                          item.probability
+                        ) * 100
+                      ).toFixed(2)}
+                      %
+                    </p>
+                  )}
+
+                  {item.threshold !==
+                    undefined && (
+                    <p>
+                      <strong>
+                        Threshold:
+                      </strong>{" "}
+                      {item.threshold}
+                    </p>
+                  )}
+
+                  {item.semantic_signal && (
+                    <p>
+                      <strong>
+                        Semantic Signal:
+                      </strong>{" "}
+                      {
+                        item.semantic_signal
+                      }
+                    </p>
+                  )}
+
+                  {item.created_at && (
+                    <p>
+                      <strong>
+                        Date:
+                      </strong>{" "}
+                      {item.created_at}
+                    </p>
+                  )}
+
+                </div>
+
+              )
+            )}
+
+          </div>
+
+        )}
+
+      </section>
+
+      <footer className="footer">
 
         <p>
-          Settings will be available soon.
+          RepoRescue • AI-powered
+          repository risk analysis
         </p>
-      </section>
+
+      </footer>
 
     </div>
   );
 }
 
 export default App;
-
