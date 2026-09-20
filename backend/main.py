@@ -17,6 +17,7 @@ from backend.models import User, Repository, Analysis
 
 # Graph & Temporal API
 from backend.graph_api import router as graph_routers
+from backend.github_oauth import router as github_oauth_router
 
 
 # =========================================================
@@ -142,6 +143,7 @@ app.add_middleware(
 # =========================================================
 
 app.include_router(graph_routers)
+app.include_router(github_oauth_router)
 
 
 # =========================================================
