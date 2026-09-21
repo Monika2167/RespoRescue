@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from scripts.predict_pr import predict_pr
 from scripts.predict_health import predict_health
-from scripts.predict_change_risk import predict_change_risk
 
 from backend.database import get_db
 from backend.auth import create_user, verify_password
@@ -25,10 +24,6 @@ from backend.github_oauth import router as github_oauth_router
 # =========================================================
 # PYDANTIC MODELS
 # =========================================================
-
-# ============================================================
-# BOTTLENECK PREDICTION MODELS
-# ============================================================
 
 class Evidence(BaseModel):
     feature: str
@@ -99,29 +94,20 @@ class RepositoryResponse(BaseModel):
 class AnalysisResponse(BaseModel):
     success: bool
     message: str
-
-    analysis_id: Optional[int] = None
-    repository_id: Optional[int] = None
-    pr_number: Optional[int] = None
-
-    probability: Optional[float] = None
-    prediction: Optional[str] = None
-    threshold: Optional[float] = None
-
-    semantic_signal: Optional[str] = None
-    semantic_strength: Optional[float] = None
-
-    top_evidence: List[Evidence] = Field(
-        default_factory=list
-    )
+    analysis_id: int
+    repository_id: int
+    pr_number: int
+    probability: float
+    prediction: str
+    threshold: float
+    semantic_signal: str
+    semantic_strength: float
+    top_evidence: List[Evidence]
 
 
 # =========================================================
-# FASTAPI APP
+# HEALTH FORECAST RESPONSE
 # =========================================================
-# ============================================================
-# HEALTH FORECAST RESPONSE MODEL
-# ============================================================
 
 class HealthForecastResponse(BaseModel):
     success: bool
@@ -137,9 +123,9 @@ class HealthForecastResponse(BaseModel):
     error: Optional[str] = None
 
 
-# ============================================================
+# =========================================================
 # FASTAPI APP
-# ============================================================
+# =========================================================
 
 app = FastAPI(
     title="RepoRescue API",
@@ -155,10 +141,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://localhost:5174",
-],
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:5174",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -176,14 +162,6 @@ app.include_router(github_oauth_router)
 # =========================================================
 # ROOT
 # =========================================================
-# ============================================================
-# ROOT
-# ============================================================
-
-
-@app.get("/change-risk/{pr_number}")
-def change_risk_prediction(pr_number: int):
-    return predict_change_risk(pr_number)
 
 @app.get("/")
 def root():
@@ -560,9 +538,6 @@ def get_analysis_history(
 # DIRECT ML PREDICTION
 # JWT PROTECTED
 # =========================================================
-# ============================================================
-# BOTTLENECK PREDICTION
-# ============================================================
 
 @app.get(
     "/predict/{pr_number}",
@@ -582,9 +557,10 @@ def predict_pull_request(
     return result
 
 
-# ============================================================
+# =========================================================
 # REPOSITORY HEALTH FORECAST
-# ============================================================
+# EXISTING MEMBER 1 HEALTH FORECAST MODEL
+# =========================================================
 
 @app.get(
     "/health-forecast",
@@ -592,6 +568,8 @@ def predict_pull_request(
 )
 def repository_health_forecast():
 
+    # Use the existing trained Health Forecast model.
+    # No retraining or ML logic modification.
     result = predict_health()
 
     return result
