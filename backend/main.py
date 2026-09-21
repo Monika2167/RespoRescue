@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from scripts.predict_pr import predict_pr
 from scripts.predict_health import predict_health
+from scripts.predict_change_risk import predict_change_risk
 
 from backend.database import get_db
 from backend.auth import create_user, verify_password
@@ -176,6 +177,11 @@ app.include_router(graph_routers)
 # ============================================================
 # ROOT
 # ============================================================
+
+
+@app.get("/change-risk/{pr_number}")
+def change_risk_prediction(pr_number: int):
+    return predict_change_risk(pr_number)
 
 @app.get("/")
 def root():
