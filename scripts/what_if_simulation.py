@@ -1,514 +1,999 @@
+import os
 import pandas as pd
-from pathlib import Path
-
-# ============================================================
-# Paths
-# ============================================================
-BASE_DIR = Path(__file__).resolve().parents[1]
-
-COMMITS_FILE = BASE_DIR / "data" / "cleaned" / "commits_clean.csv"
-FILES_FILE = BASE_DIR / "data" / "cleaned" / "files_clean.csv"
-
-OUTPUT_DIR = BASE_DIR / "data" / "graph"
-
-# Existing output - preserved
-OUTPUT_FILE = OUTPUT_DIR / "what_if_results.csv"
-
-# New scenario output
-SCENARIO_OUTPUT_FILE = OUTPUT_DIR / "what_if_scenarios.csv"
 
 
 # ============================================================
-# Load data
+# CONFIGURATION
 # ============================================================
-commits = pd.read_csv(
-    COMMITS_FILE,
-    usecols=["commit_sha", "author"]
-)
 
-files = pd.read_csv(
-    FILES_FILE,
-    usecols=["commit_sha", "pr_number", "file_name"]
-)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-print("Datasets loaded successfully.")
-print("Commits:", len(commits))
-print("File rows:", len(files))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+GRAPH_DIR = os.path.join(DATA_DIR, "graph")
 
+FILES_PATH = os.path.join(DATA_DIR, "cleaned", "files_clean.csv")
+COMMITS_PATH = os.path.join(DATA_DIR, "cleaned", "commits_clean.csv")
+PRS_PATH = os.path.join(DATA_DIR, "cleaned", "pull_requests_clean.csv")
+ISSUES_PATH = os.path.join(DATA_DIR, "cleaned", "issues_clean.csv")
+ISSUE_PR_PATH = os.path.join(DATA_DIR, "issue_pr_relationships.csv")
 
-# ============================================================
-# Join developer -> file
-# ============================================================
-developer_files = files.merge(
-    commits,
-    on="commit_sha",
-    how="inner"
-)
-
-developer_files = developer_files.dropna(
-    subset=["author", "file_name"]
-)
-
-print(
-    "Developer-file contribution rows:",
-    len(developer_files)
-)
+OUTPUT_PATH = os.path.join(GRAPH_DIR, "what_if_simulation.csv")
 
 
 # ============================================================
-# Developer-file contribution count
-# ============================================================
-contribution = (
-    developer_files
-    .groupby(
-        ["file_name", "author"],
-        as_index=False
-    )
-    .size()
-    .rename(columns={"size": "commit_count"})
-)
-
-
-# ============================================================
-# File totals
-# ============================================================
-file_totals = (
-    contribution
-    .groupby("file_name")["commit_count"]
-    .sum()
-    .rename("total_commits")
-)
-
-contribution = contribution.merge(
-    file_totals,
-    on="file_name",
-    how="left"
-)
-
-
-# ============================================================
-# Developer share
-# ============================================================
-contribution["developer_share"] = (
-    contribution["commit_count"]
-    / contribution["total_commits"]
-)
-
-
-# ============================================================
-# Dominant developer per file
-# ============================================================
-dominant = (
-    contribution
-    .sort_values(
-        ["file_name", "developer_share", "author"],
-        ascending=[True, False, True]
-    )
-    .drop_duplicates(
-        "file_name",
-        keep="first"
-    )
-)
-
-dominant = dominant[
-    [
-        "file_name",
-        "author",
-        "developer_share",
-        "total_commits"
-    ]
-].rename(
-    columns={
-        "author": "dominant_developer",
-        "developer_share": "dominant_developer_share"
-    }
-)
-
-
-# ============================================================
-# Number of contributors
-# ============================================================
-contributors = (
-    contribution
-    .groupby("file_name")["author"]
-    .nunique()
-    .rename("unique_developers")
-)
-
-dominant = dominant.merge(
-    contributors,
-    on="file_name",
-    how="left"
-)
-
-
-# ============================================================
-# EXISTING WHAT-IF FEATURES
+# HELPER FUNCTIONS
 # ============================================================
 
-dominant["files_losing_dominant_contributor"] = (
-    dominant["dominant_developer_share"] >= 0.50
-).astype(int)
+def risk_level(share):
+    """Convert concentration share into a simple risk level."""
 
-dominant["files_with_no_remaining_contributor"] = (
-    dominant["unique_developers"] == 1
-).astype(int)
+    if share >= 0.75:
+        return "HIGH"
 
-dominant["remaining_contributor_share"] = (
-    1 - dominant["dominant_developer_share"]
-)
+    if share >= 0.50:
+        return "MEDIUM"
 
-dominant["high_concentration_flag"] = (
-    dominant["dominant_developer_share"] >= 0.75
-).astype(int)
+    return "LOW"
 
 
-# ============================================================
-# SAVE EXISTING OUTPUT
-# ============================================================
-OUTPUT_DIR.mkdir(
-    parents=True,
-    exist_ok=True
-)
+def safe_unique(values):
+    """Return unique non-null string values."""
 
-dominant.to_csv(
-    OUTPUT_FILE,
-    index=False
-)
-
-
-# ============================================================
-# NEW: DEVELOPER AVAILABILITY SCENARIO
-# ============================================================
-#
-# Efficient approach:
-# We calculate all remaining contribution values using
-# grouped tables instead of filtering the full dataframe
-# repeatedly.
-# ============================================================
-
-# Total contribution for each developer-file pair
-# already available in `contribution`.
-
-# For every file, calculate the total contribution excluding
-# each developer.
-contribution["remaining_commit_count"] = (
-    contribution["total_commits"]
-    - contribution["commit_count"]
-)
-
-contribution["remaining_share"] = (
-    contribution["remaining_commit_count"]
-    / contribution["total_commits"]
-)
-
-# Number of developers remaining after removing this developer
-contribution["remaining_developers"] = (
-    contribution["file_name"]
-    .map(
-        contribution
-        .groupby("file_name")["author"]
-        .nunique()
-    )
-    - 1
-)
-
-# Developer is dominant if their share equals maximum share
-max_share = (
-    contribution
-    .groupby("file_name")["developer_share"]
-    .transform("max")
-)
-
-contribution["is_dominant"] = (
-    contribution["developer_share"] == max_share
-).astype(int)
-
-
-developer_scenarios = contribution.copy()
-
-developer_scenarios["scenario_type"] = (
-    "DEVELOPER_UNAVAILABLE"
-)
-
-developer_scenarios["target_developer"] = (
-    developer_scenarios["author"]
-)
-
-developer_scenarios["target_file"] = (
-    developer_scenarios["file_name"]
-)
-
-developer_scenarios["before_value"] = (
-    developer_scenarios["developer_share"]
-)
-
-# After removing target developer, their own contribution = 0
-developer_scenarios["after_value"] = 0.0
-
-developer_scenarios["change"] = (
-    developer_scenarios["after_value"]
-    - developer_scenarios["before_value"]
-)
-
-developer_scenarios["remaining_contribution_records"] = (
-    developer_scenarios["remaining_commit_count"]
-)
-
-developer_scenarios["affected"] = (
-    developer_scenarios["is_dominant"]
-)
-
-# Scenario status
-developer_scenarios["scenario_status"] = "NON_DOMINANT_CONTRIBUTOR_REMOVED"
-
-developer_scenarios.loc[
-    developer_scenarios["is_dominant"] == 1,
-    "scenario_status"
-] = "DOMINANT_CONTRIBUTOR_REMOVED"
-
-developer_scenarios.loc[
-    developer_scenarios["remaining_developers"] == 0,
-    "scenario_status"
-] = "NO_REMAINING_CONTRIBUTOR"
-
-developer_scenarios["evidence"] = (
-    developer_scenarios["target_developer"].astype(str)
-    + " contributed "
-    + developer_scenarios["commit_count"].astype(str)
-    + " of "
-    + developer_scenarios["total_commits"].astype(str)
-    + " contribution records for this file."
-)
-
-developer_scenarios = developer_scenarios[
-    [
-        "scenario_type",
-        "target_developer",
-        "target_file",
-        "before_value",
-        "after_value",
-        "change",
-        "remaining_developers",
-        "remaining_contribution_records",
-        "affected",
-        "scenario_status",
-        "evidence"
-    ]
-]
-
-
-# ============================================================
-# NEW: FILE CHANGE SCENARIO
-# ============================================================
-
-file_developers = (
-    contribution
-    .groupby("file_name")
-    .agg(
-        related_developers=(
-            "author",
-            lambda x: "|".join(
-                sorted(
-                    x.astype(str).unique()
-                )
-            )
-        ),
-        developer_count=(
-            "author",
-            "nunique"
-        ),
-        total_contribution_records=(
-            "commit_count",
-            "sum"
+    return sorted(
+        set(
+            str(v)
+            for v in values
+            if pd.notna(v)
         )
     )
-    .reset_index()
-)
-
-file_scenarios = file_developers.copy()
-
-file_scenarios["scenario_type"] = (
-    "FILE_CHANGE"
-)
-
-file_scenarios["target_developer"] = ""
-
-file_scenarios["target_file"] = (
-    file_scenarios["file_name"]
-)
-
-# Current contribution record count
-file_scenarios["before_value"] = (
-    file_scenarios["total_contribution_records"]
-)
-
-# File-change scenario does not assume loss of contribution.
-# Therefore before and after remain equal.
-file_scenarios["after_value"] = (
-    file_scenarios["total_contribution_records"]
-)
-
-file_scenarios["change"] = 0
-
-file_scenarios["remaining_developers"] = (
-    file_scenarios["developer_count"]
-)
-
-file_scenarios["remaining_contribution_records"] = (
-    file_scenarios["total_contribution_records"]
-)
-
-file_scenarios["affected"] = 1
-
-file_scenarios["scenario_status"] = (
-    "DIRECT_FILE_ACTIVITY"
-)
-
-file_scenarios["evidence"] = (
-    "File has "
-    + file_scenarios["developer_count"].astype(str)
-    + " developer(s) based on actual commit-file records."
-)
-
-file_scenarios = file_scenarios[
-    [
-        "scenario_type",
-        "target_developer",
-        "target_file",
-        "before_value",
-        "after_value",
-        "change",
-        "remaining_developers",
-        "remaining_contribution_records",
-        "affected",
-        "scenario_status",
-        "evidence"
-    ]
-]
 
 
 # ============================================================
-# Combine scenarios
+# LOAD DATA
 # ============================================================
-scenarios = pd.concat(
-    [
-        developer_scenarios,
-        file_scenarios
-    ],
-    ignore_index=True
-)
 
+def load_data():
 
-# ============================================================
-# Validation / cleanup
-# ============================================================
-scenarios = scenarios.drop_duplicates()
+    print("Loading datasets...")
 
-scenarios = scenarios.reset_index(
-    drop=True
-)
+    files = pd.read_csv(FILES_PATH)
+    commits = pd.read_csv(COMMITS_PATH)
+    prs = pd.read_csv(PRS_PATH)
+    issues = pd.read_csv(ISSUES_PATH)
+    issue_pr = pd.read_csv(ISSUE_PR_PATH)
 
+    print("Files:", len(files))
+    print("Commits:", len(commits))
+    print("PRs:", len(prs))
+    print("Issues:", len(issues))
+    print("Issue-PR relationships:", len(issue_pr))
 
-# ============================================================
-# Save new scenario output
-# ============================================================
-scenarios.to_csv(
-    SCENARIO_OUTPUT_FILE,
-    index=False
-)
+    return files, commits, prs, issues, issue_pr
 
 
 # ============================================================
-# Final validation
+# PREPARE DATA
 # ============================================================
-print("\n================================================")
-print("WHAT-IF SIMULATION COMPLETED")
-print("================================================")
 
-print(
-    "Files analyzed:",
-    len(dominant)
-)
+def prepare_data(files, commits, prs, issues, issue_pr):
 
-print(
-    "Files losing dominant contributor:",
-    int(
-        dominant[
-            "files_losing_dominant_contributor"
-        ].sum()
+    print("\nPreparing relationships...")
+
+    # --------------------------------------------------------
+    # Numeric columns
+    # --------------------------------------------------------
+
+    for column in ["additions", "deletions", "changes"]:
+
+        if column in files.columns:
+
+            files[column] = pd.to_numeric(
+                files[column],
+                errors="coerce"
+            ).fillna(0)
+
+    # --------------------------------------------------------
+    # Commit author information
+    # --------------------------------------------------------
+
+    commit_author = (
+        commits[
+            ["commit_sha", "author", "pr_number"]
+        ]
+        .drop_duplicates()
     )
-)
 
-print(
-    "Files with no remaining contributor:",
-    int(
-        dominant[
-            "files_with_no_remaining_contributor"
-        ].sum()
+    # --------------------------------------------------------
+    # Developer -> File relationships
+    # --------------------------------------------------------
+
+    developer_files = files.merge(
+        commit_author,
+        on="commit_sha",
+        how="inner"
     )
-)
 
-print(
-    "Highly concentrated files:",
-    int(
-        dominant[
-            "high_concentration_flag"
-        ].sum()
+    developer_files = developer_files.dropna(
+        subset=["author", "file_name"]
     )
-)
 
-print("\nExisting output:")
-print(OUTPUT_FILE)
+    developer_files["author"] = (
+        developer_files["author"]
+        .astype(str)
+    )
 
-print("\nNew scenario output:")
-print(SCENARIO_OUTPUT_FILE)
+    developer_files["file_name"] = (
+        developer_files["file_name"]
+        .astype(str)
+    )
 
-print("\nScenario rows:", len(scenarios))
+    # --------------------------------------------------------
+    # Developer-file commit counts
+    # --------------------------------------------------------
 
-print("\nScenario types:")
-print(
-    scenarios[
-        "scenario_type"
-    ].value_counts()
-)
+    relationship_counts = (
+        developer_files
+        .groupby(
+            ["author", "file_name"],
+            as_index=False
+        )
+        .agg(
+            commit_count=("commit_sha", "nunique"),
+            total_changes=("changes", "sum"),
+            pr_count=("pr_number_x", "nunique")
+        )
+    )
 
-print("\nExisting output shape:")
-print(dominant.shape)
+    # --------------------------------------------------------
+    # File total commits
+    # --------------------------------------------------------
 
-print(
-    "Existing output missing values:",
-    int(dominant.isna().sum().sum())
-)
+    file_totals = (
+        relationship_counts
+        .groupby("file_name")["commit_count"]
+        .sum()
+        .to_dict()
+    )
 
-print(
-    "Existing output duplicate rows:",
-    int(dominant.duplicated().sum())
-)
+    # --------------------------------------------------------
+    # File -> Developers
+    # --------------------------------------------------------
 
-print("\nScenario output shape:")
-print(scenarios.shape)
+    file_developers = {}
 
-print(
-    "Scenario output missing values:",
-    int(scenarios.isna().sum().sum())
-)
+    for file_name, group in relationship_counts.groupby("file_name"):
 
-print(
-    "Scenario output duplicate rows:",
-    int(scenarios.duplicated().sum())
-)
+        file_developers[str(file_name)] = {
+            str(row.author): float(row.commit_count)
+            for row in group.itertuples()
+        }
 
-print("\nSample existing results:")
-print(
-    dominant.head(5).to_string(
+    # --------------------------------------------------------
+    # Developer -> Files
+    # --------------------------------------------------------
+
+    developer_files_map = {}
+
+    for developer, group in relationship_counts.groupby("author"):
+
+        developer_files_map[str(developer)] = group
+
+    # --------------------------------------------------------
+    # File -> PRs
+    # --------------------------------------------------------
+
+    file_pr_map = {}
+
+    for file_name, group in files.groupby("file_name"):
+
+        prs_for_file = safe_unique(
+            group["pr_number"]
+        )
+
+        file_pr_map[str(file_name)] = prs_for_file
+
+    # --------------------------------------------------------
+    # Developer -> PRs
+    # --------------------------------------------------------
+
+    developer_pr_map = {}
+
+    developer_commit_data = commits.dropna(
+        subset=["author", "pr_number"]
+    ).copy()
+
+    for developer, group in developer_commit_data.groupby("author"):
+
+        developer_pr_map[str(developer)] = safe_unique(
+            group["pr_number"]
+        )
+
+    # --------------------------------------------------------
+    # PR -> Issues
+    # --------------------------------------------------------
+
+    pr_issue_map = {}
+
+    if (
+        "pr_number" in issue_pr.columns
+        and "issue_number" in issue_pr.columns
+    ):
+
+        for pr_number, group in issue_pr.groupby("pr_number"):
+
+            pr_issue_map[str(pr_number)] = safe_unique(
+                group["issue_number"]
+            )
+
+    # --------------------------------------------------------
+    # PR dates
+    # --------------------------------------------------------
+
+    if "created_at" in prs.columns:
+
+        prs["created_at"] = pd.to_datetime(
+            prs["created_at"],
+            errors="coerce"
+        )
+
+    print("Relationships prepared successfully.")
+
+    return (
+        relationship_counts,
+        file_totals,
+        file_developers,
+        developer_files_map,
+        file_pr_map,
+        developer_pr_map,
+        pr_issue_map,
+        prs
+    )
+
+
+# ============================================================
+# SCENARIO 1
+# DEVELOPER UNAVAILABLE
+# ============================================================
+
+def simulate_developer_unavailable(
+    relationship_counts,
+    file_totals,
+    file_developers,
+    developer_files_map,
+    file_pr_map,
+    developer_pr_map,
+    pr_issue_map
+):
+
+    print("\n----------------------------------------")
+    print("SCENARIO 1: DEVELOPER UNAVAILABLE")
+    print("----------------------------------------")
+
+    rows = []
+
+    developers = sorted(
+        developer_files_map.keys()
+    )
+
+    print("Developers:", len(developers))
+
+    for index, developer in enumerate(
+        developers,
+        start=1
+    ):
+
+        developer_data = developer_files_map[developer]
+
+        for row in developer_data.itertuples():
+
+            file_name = str(row.file_name)
+
+            developer_commits = float(
+                row.commit_count
+            )
+
+            total_commits = float(
+                file_totals.get(file_name, 0)
+            )
+
+            if total_commits <= 0:
+                continue
+
+            # ---------------------------------------------
+            # BEFORE
+            # ---------------------------------------------
+
+            before_share = (
+                developer_commits /
+                total_commits
+            )
+
+            before_risk = risk_level(
+                before_share
+            )
+
+            # ---------------------------------------------
+            # AFTER
+            # Remove developer's contribution
+            # ---------------------------------------------
+
+            developers_for_file = (
+                file_developers
+                .get(file_name, {})
+                .copy()
+            )
+
+            developers_for_file.pop(
+                developer,
+                None
+            )
+
+            remaining_total = sum(
+                developers_for_file.values()
+            )
+
+            if remaining_total > 0:
+
+                dominant_after = max(
+                    developers_for_file.values()
+                )
+
+                after_share = (
+                    dominant_after /
+                    remaining_total
+                )
+
+            else:
+
+                after_share = 0
+
+            after_risk = risk_level(
+                after_share
+            )
+
+            # ---------------------------------------------
+            # AFFECTED ENTITIES
+            # ---------------------------------------------
+
+            affected_developers = safe_unique(
+                developers_for_file.keys()
+            )
+
+            affected_prs = (
+                developer_pr_map
+                .get(developer, [])
+            )
+
+            file_prs = file_pr_map.get(
+                file_name,
+                []
+            )
+
+            affected_prs = sorted(
+                set(
+                    affected_prs +
+                    file_prs
+                )
+            )
+
+            affected_issues = []
+
+            for pr in affected_prs:
+
+                affected_issues.extend(
+                    pr_issue_map.get(
+                        str(pr),
+                        []
+                    )
+                )
+
+            affected_issues = sorted(
+                set(affected_issues)
+            )
+
+            entities = [
+                f"DEVELOPER:{developer}",
+                f"FILE:{file_name}"
+            ]
+
+            entities.extend(
+                f"DEVELOPER:{d}"
+                for d in affected_developers[:20]
+            )
+
+            entities.extend(
+                f"PR:{p}"
+                for p in affected_prs[:20]
+            )
+
+            entities.extend(
+                f"ISSUE:{i}"
+                for i in affected_issues[:20]
+            )
+
+            # ---------------------------------------------
+            # OUTPUT
+            # ---------------------------------------------
+
+            rows.append({
+
+                "scenario_type":
+                    "DEVELOPER_UNAVAILABLE",
+
+                "scenario_status":
+                    "SIMULATED",
+
+                "target_developer":
+                    developer,
+
+                "target_file":
+                    file_name,
+
+                "target_pr":
+                    "",
+
+                "before_value":
+                    round(before_share, 6),
+
+                "after_value":
+                    round(after_share, 6),
+
+                "change":
+                    round(
+                        after_share -
+                        before_share,
+                        6
+                    ),
+
+                "before_concentration_risk":
+                    before_risk,
+
+                "after_concentration_risk":
+                    after_risk,
+
+                "risk_change":
+                    (
+                        "NO_CHANGE"
+                        if before_risk == after_risk
+                        else
+                        f"{before_risk}_TO_{after_risk}"
+                    ),
+
+                "relationship_change":
+                    "DEVELOPER_FILE_RELATIONSHIP_REMOVED",
+
+                "affected_entity_count":
+                    len(set(entities)),
+
+                "affected_entity_types":
+                    "DEVELOPER,FILE,PR,ISSUE",
+
+                "affected_entities":
+                    ";".join(
+                        list(dict.fromkeys(entities))
+                    ),
+
+                "affected_developers":
+                    ";".join(
+                        affected_developers[:30]
+                    ),
+
+                "affected_files":
+                    file_name,
+
+                "affected_prs":
+                    ";".join(
+                        affected_prs[:30]
+                    ),
+
+                "affected_issues":
+                    ";".join(
+                        affected_issues[:30]
+                    ),
+
+                "impact_paths":
+                    (
+                        f"DEVELOPER:{developer}"
+                        f" -> FILE:{file_name}"
+                    ),
+
+                "evidence":
+                    (
+                        "Simulated removal of the "
+                        "developer-file relationship "
+                        "using observed repository data."
+                    )
+            })
+
+        if (
+            index % 50 == 0
+            or index == len(developers)
+        ):
+
+            print(
+                f"Developers processed: "
+                f"{index}/{len(developers)}"
+            )
+
+    return rows
+
+
+# ============================================================
+# SCENARIO 2
+# FILE CHANGE
+# ============================================================
+
+def simulate_file_change(
+    relationship_counts,
+    file_developers,
+    file_pr_map
+):
+
+    print("\n----------------------------------------")
+    print("SCENARIO 2: FILE CHANGE")
+    print("----------------------------------------")
+
+    rows = []
+
+    files = sorted(
+        file_developers.keys()
+    )
+
+    print("Files:", len(files))
+
+    for index, file_name in enumerate(
+        files,
+        start=1
+    ):
+
+        developers = file_developers[
+            file_name
+        ]
+
+        total_commits = sum(
+            developers.values()
+        )
+
+        developer_names = sorted(
+            developers.keys()
+        )
+
+        affected_prs = file_pr_map.get(
+            file_name,
+            []
+        )
+
+        entities = [
+            f"FILE:{file_name}"
+        ]
+
+        entities.extend(
+            f"DEVELOPER:{d}"
+            for d in developer_names[:30]
+        )
+
+        entities.extend(
+            f"PR:{p}"
+            for p in affected_prs[:30]
+        )
+
+        rows.append({
+
+            "scenario_type":
+                "FILE_CHANGE",
+
+            "scenario_status":
+                "SIMULATED",
+
+            "target_developer":
+                "",
+
+            "target_file":
+                file_name,
+
+            "target_pr":
+                "",
+
+            "before_value":
+                total_commits,
+
+            "after_value":
+                total_commits,
+
+            "change":
+                0,
+
+            "before_concentration_risk":
+                "OBSERVED",
+
+            "after_concentration_risk":
+                "REQUIRES_NEW_CHANGE_DATA",
+
+            "risk_change":
+                "NOT_ESTIMATED",
+
+            "relationship_change":
+                "FILE_SELECTED_FOR_CHANGE",
+
+            "affected_entity_count":
+                len(entities),
+
+            "affected_entity_types":
+                "FILE,DEVELOPER,PR",
+
+            "affected_entities":
+                ";".join(entities),
+
+            "affected_developers":
+                ";".join(
+                    developer_names[:30]
+                ),
+
+            "affected_files":
+                file_name,
+
+            "affected_prs":
+                ";".join(
+                    affected_prs[:30]
+                ),
+
+            "affected_issues":
+                "",
+
+            "impact_paths":
+                f"FILE:{file_name} -> DEVELOPER",
+
+            "evidence":
+                (
+                    "Selected file for simulated "
+                    "change using observed "
+                    "developer-file relationships."
+                )
+        })
+
+        if (
+            index % 1000 == 0
+            or index == len(files)
+        ):
+
+            print(
+                f"Files processed: "
+                f"{index}/{len(files)}"
+            )
+
+    return rows
+
+
+# ============================================================
+# SCENARIO 3
+# PR DELAY
+# ============================================================
+
+def simulate_pr_delay(
+    prs,
+    file_pr_map,
+    pr_issue_map,
+    developer_pr_map
+):
+
+    print("\n----------------------------------------")
+    print("SCENARIO 3: PR DELAY")
+    print("----------------------------------------")
+
+    rows = []
+
+    valid_prs = prs[
+        prs["pr_number"].notna()
+    ].copy()
+
+    print(
+        "PRs available:",
+        len(valid_prs)
+    )
+
+    for index, row in enumerate(
+        valid_prs.itertuples(),
+        start=1
+    ):
+
+        pr_number = str(
+            row.pr_number
+        )
+
+        # ---------------------------------------------
+        # Files affected by this PR
+        # ---------------------------------------------
+
+        affected_files = []
+
+        for file_name, pr_list in file_pr_map.items():
+
+            if pr_number in {
+                str(x)
+                for x in pr_list
+            }:
+
+                affected_files.append(
+                    file_name
+                )
+
+        # ---------------------------------------------
+        # Issues
+        # ---------------------------------------------
+
+        affected_issues = pr_issue_map.get(
+            pr_number,
+            []
+        )
+
+        # ---------------------------------------------
+        # Developers
+        # ---------------------------------------------
+
+        affected_developers = []
+
+        for developer, pr_list in developer_pr_map.items():
+
+            if pr_number in {
+                str(x)
+                for x in pr_list
+            }:
+
+                affected_developers.append(
+                    developer
+                )
+
+        entities = [
+            f"PR:{pr_number}"
+        ]
+
+        entities.extend(
+            f"FILE:{f}"
+            for f in affected_files[:30]
+        )
+
+        entities.extend(
+            f"DEVELOPER:{d}"
+            for d in affected_developers[:30]
+        )
+
+        entities.extend(
+            f"ISSUE:{i}"
+            for i in affected_issues[:30]
+        )
+
+        rows.append({
+
+            "scenario_type":
+                "PR_DELAY",
+
+            "scenario_status":
+                "SIMULATED",
+
+            "target_developer":
+                "",
+
+            "target_file":
+                "",
+
+            "target_pr":
+                pr_number,
+
+            "before_value":
+                0,
+
+            "after_value":
+                1,
+
+            "change":
+                1,
+
+            "before_concentration_risk":
+                "OBSERVED",
+
+            "after_concentration_risk":
+                "DELAYED",
+
+            "risk_change":
+                "PR_DELAY_SIMULATED",
+
+            "relationship_change":
+                "PR_PROGRESS_DELAYED",
+
+            "affected_entity_count":
+                len(entities),
+
+            "affected_entity_types":
+                "PR,FILE,DEVELOPER,ISSUE",
+
+            "affected_entities":
+                ";".join(entities),
+
+            "affected_developers":
+                ";".join(
+                    affected_developers[:30]
+                ),
+
+            "affected_files":
+                ";".join(
+                    affected_files[:30]
+                ),
+
+            "affected_prs":
+                pr_number,
+
+            "affected_issues":
+                ";".join(
+                    affected_issues[:30]
+                ),
+
+            "impact_paths":
+                (
+                    f"PR:{pr_number}"
+                    " -> FILE/ISSUE/DEVELOPER"
+                ),
+
+            "evidence":
+                (
+                    "Simulated delay of the "
+                    "selected pull request. "
+                    "Affected entities are "
+                    "derived from observed "
+                    "repository relationships."
+                )
+        })
+
+        if (
+            index % 500 == 0
+            or index == len(valid_prs)
+        ):
+
+            print(
+                f"PRs processed: "
+                f"{index}/{len(valid_prs)}"
+            )
+
+    return rows
+
+
+# ============================================================
+# SAVE RESULTS
+# ============================================================
+
+def save_results(rows):
+
+    print("\nSaving results...")
+
+    result = pd.DataFrame(rows)
+
+    os.makedirs(
+        GRAPH_DIR,
+        exist_ok=True
+    )
+
+    result.to_csv(
+        OUTPUT_PATH,
         index=False
     )
-)
 
-print("\nSample scenario results:")
-print(
-    scenarios.head(5).to_string(
-        index=False
+    print(
+        "\nWhat-if simulation completed."
     )
-)
+
+    print(
+        "Total rows:",
+        len(result)
+    )
+
+    print(
+        "Output:",
+        OUTPUT_PATH
+    )
+
+    print("\nScenario counts:")
+
+    print(
+        result["scenario_type"]
+        .value_counts()
+    )
+
+    return result
+
+
+# ============================================================
+# MAIN
+# ============================================================
+
+def main():
+
+    print("=" * 60)
+    print("REPORESCUE - WHAT-IF SIMULATION")
+    print("=" * 60)
+
+    try:
+
+        (
+            files,
+            commits,
+            prs,
+            issues,
+            issue_pr
+        ) = load_data()
+
+        (
+            relationship_counts,
+            file_totals,
+            file_developers,
+            developer_files_map,
+            file_pr_map,
+            developer_pr_map,
+            pr_issue_map,
+            prs
+        ) = prepare_data(
+            files,
+            commits,
+            prs,
+            issues,
+            issue_pr
+        )
+
+        # ----------------------------------------------------
+        # Scenario 1
+        # ----------------------------------------------------
+
+        rows_1 = simulate_developer_unavailable(
+            relationship_counts,
+            file_totals,
+            file_developers,
+            developer_files_map,
+            file_pr_map,
+            developer_pr_map,
+            pr_issue_map
+        )
+
+        # ----------------------------------------------------
+        # Scenario 2
+        # ----------------------------------------------------
+
+        rows_2 = simulate_file_change(
+            relationship_counts,
+            file_developers,
+            file_pr_map
+        )
+
+        # ----------------------------------------------------
+        # Scenario 3
+        # ----------------------------------------------------
+
+        rows_3 = simulate_pr_delay(
+            prs,
+            file_pr_map,
+            pr_issue_map,
+            developer_pr_map
+        )
+
+        # ----------------------------------------------------
+        # Combine
+        # ----------------------------------------------------
+
+        all_rows = (
+            rows_1 +
+            rows_2 +
+            rows_3
+        )
+
+        save_results(
+            all_rows
+        )
+
+    except Exception as error:
+
+        print("\nERROR:")
+        print(type(error).__name__)
+        print(error)
+
+        raise
+
+
+if __name__ == "__main__":
+    main()
