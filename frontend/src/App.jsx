@@ -51,6 +51,15 @@ function App() {
   const [graphLoading, setGraphLoading] = useState(false);
   const [graphMessage, setGraphMessage] = useState("");
 
+  // =========================
+  // HEALTH FORECAST
+  // =========================
+
+  const [healthForecast, setHealthForecast] = useState(null);
+  const [healthForecastLoading, setHealthForecastLoading] =
+    useState(false);
+  const [healthForecastError, setHealthForecastError] = useState("");
+
   const [settings, setSettings] = useState({
     notifications: true,
     compactMode: false,
@@ -154,6 +163,9 @@ function App() {
 
     setAnalysisResult(null);
     setHistory([]);
+
+    setHealthForecast(null);
+    setHealthForecastError("");
 
     setPage("login");
     setMessage("");
@@ -393,14 +405,16 @@ function App() {
       setAnalysisResult(null);
 
       if (!repositoryId) {
-        setMessage("Please connect a repository first.");
+        setMessage(
+          "Please connect a repository first."
+        );
         return;
       }
 
       const data = await apiRequest(
         `${API_BASE}/repositories/${repositoryId}/analyze/${prNumber}`,
         {
-          method: "POST"
+          method: "POST",
         }
       );
 
@@ -410,7 +424,6 @@ function App() {
         "PR analysis completed successfully."
       );
 
-      // Wait for state/repository to be available
       if (repositoryId) {
         await loadHistory();
       }
@@ -455,25 +468,6 @@ function App() {
         "Analysis history API response:",
         data
       );
-
-      /*
-        Backend may return:
-        {
-          history: [...]
-        }
-
-        OR
-
-        {
-          analyses: [...]
-        }
-
-        OR
-
-        {
-          data: [...]
-        }
-      */
 
       let historyData = [];
 
@@ -592,6 +586,44 @@ function App() {
   };
 
   // =========================
+  // HEALTH FORECAST
+  // =========================
+
+  const loadHealthForecast = async () => {
+    try {
+      setHealthForecastLoading(true);
+      setHealthForecastError("");
+
+      const data = await apiRequest(
+        `${API_BASE}/health-forecast`
+      );
+
+      if (!data.success) {
+        throw new Error(
+          data.error ||
+            "Health forecast is unavailable."
+        );
+      }
+
+      setHealthForecast(data);
+    } catch (error) {
+      console.error(
+        "Health forecast error:",
+        error
+      );
+
+      setHealthForecast(null);
+
+      setHealthForecastError(
+        error.message ||
+          "Unable to load repository health forecast."
+      );
+    } finally {
+      setHealthForecastLoading(false);
+    }
+  };
+
+  // =========================
   // GITHUB CALLBACK
   // =========================
 
@@ -643,6 +675,19 @@ function App() {
       loadHistory();
     }
   }, [repositoryId]);
+
+  // =========================
+  // LOAD HEALTH FORECAST
+  // =========================
+
+  useEffect(() => {
+    if (
+      page === "dashboard" &&
+      userId
+    ) {
+      loadHealthForecast();
+    }
+  }, [page, userId]);
 
   // =========================
   // SETTINGS
@@ -1071,6 +1116,396 @@ function App() {
 
           </div>
         )}
+
+      </section>
+
+      {/* =========================
+          REPOSITORY HEALTH FORECAST
+      ========================= */}
+
+      <section className="card">
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "16px",
+            flexWrap: "wrap",
+          }}
+        >
+
+          <div>
+            <h2>
+              📈 Repository Health Forecast
+            </h2>
+
+            <p>
+              ML-based prediction of the
+              future 7-day average open
+              pull request backlog.
+            </p>
+          </div>
+
+          <button
+            className="button"
+            onClick={loadHealthForecast}
+            disabled={healthForecastLoading}
+          >
+            {healthForecastLoading
+              ? "Loading Forecast..."
+              : "🔄 Refresh Forecast"}
+          </button>
+
+        </div>
+
+        {healthForecastLoading && (
+          <div className="analysis-result">
+            <p>
+              Loading real health forecast
+              from the backend model...
+            </p>
+          </div>
+        )}
+
+        {!healthForecastLoading &&
+          healthForecastError && (
+            <div className="analysis-result">
+
+              <h3>
+                ⚠️ Forecast Unavailable
+              </h3>
+
+              <p>
+                {healthForecastError}
+              </p>
+
+              <button
+                className="button secondary"
+                onClick={
+                  loadHealthForecast
+                }
+              >
+                Retry
+              </button>
+
+            </div>
+          )}
+
+        {!healthForecastLoading &&
+          !healthForecastError &&
+          healthForecast && (
+
+            <div>
+
+              {/* Forecast summary */}
+
+              <div className="analysis-grid">
+
+                <div className="analysis-box">
+
+                  <h3>
+                    📅 Forecast Date
+                  </h3>
+
+                  <p>
+                    {new Date(
+                      healthForecast.date
+                    ).toLocaleDateString(
+                      "en-IN",
+                      {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      }
+                    )}
+                  </p>
+
+                </div>
+
+                <div className="analysis-box">
+
+                  <h3>
+                    🔮 Predicted 7-Day PR Backlog
+                  </h3>
+
+                  <p
+                    style={{
+                      fontSize: "28px",
+                      fontWeight: "700",
+                    }}
+                  >
+                    {Number(
+                      healthForecast.forecast
+                    ).toFixed(2)}
+                  </p>
+
+                  <small>
+                    Average open PR backlog
+                    over next 7 days
+                  </small>
+
+                </div>
+
+                <div className="analysis-box">
+
+                  <h3>
+                    📂 Current Open PRs
+                  </h3>
+
+                  <p
+                    style={{
+                      fontSize: "28px",
+                      fontWeight: "700",
+                    }}
+                  >
+                    {Number(
+                      healthForecast.current_open_pr_backlog
+                    ).toFixed(0)}
+                  </p>
+
+                </div>
+
+                <div className="analysis-box">
+
+                  <h3>
+                    🐛 Current Open Issues
+                  </h3>
+
+                  <p
+                    style={{
+                      fontSize: "28px",
+                      fontWeight: "700",
+                    }}
+                  >
+                    {Number(
+                      healthForecast.current_open_issue_backlog
+                    ).toFixed(0)}
+                  </p>
+
+                </div>
+
+              </div>
+
+              {/* Simple actual-value visualization */}
+
+              <div
+                style={{
+                  marginTop: "24px",
+                  padding: "20px",
+                  borderRadius: "12px",
+                  border: "1px solid rgba(128,128,128,0.25)",
+                }}
+              >
+
+                <h3>
+                  Current vs Forecast PR Backlog
+                </h3>
+
+                <p>
+                  The forecast is compared
+                  directly with the current
+                  open PR backlog returned by
+                  the backend.
+                </p>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gap: "18px",
+                    marginTop: "20px",
+                  }}
+                >
+
+                  <div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent:
+                          "space-between",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      <strong>
+                        Current Open PR Backlog
+                      </strong>
+
+                      <span>
+                        {Number(
+                          healthForecast.current_open_pr_backlog
+                        ).toFixed(0)}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        width: "100%",
+                        height: "16px",
+                        background:
+                          "rgba(128,128,128,0.18)",
+                        borderRadius: "10px",
+                        overflow: "hidden",
+                      }}
+                    >
+
+                      <div
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            (
+                              Number(
+                                healthForecast.current_open_pr_backlog
+                              ) /
+                              Math.max(
+                                Number(
+                                  healthForecast.current_open_pr_backlog
+                                ),
+                                Number(
+                                  healthForecast.forecast
+                                )
+                              )
+                            ) * 100
+                          )}%`,
+                          height: "100%",
+                          background:
+                            "linear-gradient(90deg, #2563eb, #06b6d4)",
+                          borderRadius: "10px",
+                        }}
+                      />
+
+                    </div>
+
+                  </div>
+
+                  <div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent:
+                          "space-between",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      <strong>
+                        Forecast 7-Day Average
+                      </strong>
+
+                      <span>
+                        {Number(
+                          healthForecast.forecast
+                        ).toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        width: "100%",
+                        height: "16px",
+                        background:
+                          "rgba(128,128,128,0.18)",
+                        borderRadius: "10px",
+                        overflow: "hidden",
+                      }}
+                    >
+
+                      <div
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            (
+                              Number(
+                                healthForecast.forecast
+                              ) /
+                              Math.max(
+                                Number(
+                                  healthForecast.current_open_pr_backlog
+                                ),
+                                Number(
+                                  healthForecast.forecast
+                                )
+                              )
+                            ) * 100
+                          )}%`,
+                          height: "100%",
+                          background:
+                            "linear-gradient(90deg, #7c3aed, #ec4899)",
+                          borderRadius: "10px",
+                        }}
+                      />
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* Explanation */}
+
+              <div
+                className="analysis-result"
+                style={{
+                  marginTop: "20px",
+                }}
+              >
+
+                <h3>
+                  🧠 What does this forecast mean?
+                </h3>
+
+                <p>
+                  The current repository snapshot
+                  has{" "}
+                  <strong>
+                    {Number(
+                      healthForecast.current_open_pr_backlog
+                    ).toFixed(0)}
+                  </strong>{" "}
+                  open pull requests. The trained
+                  Ridge Regression model predicts a
+                  future 7-day average backlog of{" "}
+                  <strong>
+                    {Number(
+                      healthForecast.forecast
+                    ).toFixed(2)}
+                  </strong>.
+                </p>
+
+                <p>
+                  The model also considers the
+                  current open issue backlog of{" "}
+                  <strong>
+                    {Number(
+                      healthForecast.current_open_issue_backlog
+                    ).toFixed(0)}
+                  </strong>{" "}
+                  along with{" "}
+                  <strong>
+                    {healthForecast.feature_count}
+                  </strong>{" "}
+                  engineered temporal and backlog
+                  features.
+                </p>
+
+                <p>
+                  Model:{" "}
+                  <strong>
+                    {healthForecast.model}
+                  </strong>
+                  {" | "}
+                  Alpha:{" "}
+                  <strong>
+                    {healthForecast.alpha}
+                  </strong>
+                </p>
+
+              </div>
+
+            </div>
+          )}
 
       </section>
 

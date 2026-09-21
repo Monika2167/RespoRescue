@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, EmailStr
 from sqlalchemy.orm import Session
 
 from scripts.predict_pr import predict_pr
+from scripts.predict_health import predict_health
 
 from backend.database import get_db
 from backend.auth import create_user, verify_password
@@ -93,21 +94,33 @@ class RepositoryResponse(BaseModel):
 class AnalysisResponse(BaseModel):
     success: bool
     message: str
+    analysis_id: int
+    repository_id: int
+    pr_number: int
+    probability: float
+    prediction: str
+    threshold: float
+    semantic_signal: str
+    semantic_strength: float
+    top_evidence: List[Evidence]
 
-    analysis_id: Optional[int] = None
-    repository_id: Optional[int] = None
-    pr_number: Optional[int] = None
 
-    probability: Optional[float] = None
-    prediction: Optional[str] = None
-    threshold: Optional[float] = None
+# =========================================================
+# HEALTH FORECAST RESPONSE
+# =========================================================
 
-    semantic_signal: Optional[str] = None
-    semantic_strength: Optional[float] = None
-
-    top_evidence: List[Evidence] = Field(
-        default_factory=list
-    )
+class HealthForecastResponse(BaseModel):
+    success: bool
+    date: Optional[str] = None
+    forecast: Optional[float] = None
+    forecast_unit: Optional[str] = None
+    current_open_pr_backlog: Optional[float] = None
+    current_open_issue_backlog: Optional[float] = None
+    model: Optional[str] = None
+    alpha: Optional[float] = None
+    feature_count: Optional[int] = None
+    features: List[str] = Field(default_factory=list)
+    error: Optional[str] = None
 
 
 # =========================================================
@@ -128,10 +141,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://localhost:5174",
-],
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:5174",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -540,5 +553,23 @@ def predict_pull_request(
 
     if not result["success"]:
         result["pr_number"] = pr_number
+
+    return result
+
+
+# =========================================================
+# REPOSITORY HEALTH FORECAST
+# EXISTING MEMBER 1 HEALTH FORECAST MODEL
+# =========================================================
+
+@app.get(
+    "/health-forecast",
+    response_model=HealthForecastResponse
+)
+def repository_health_forecast():
+
+    # Use the existing trained Health Forecast model.
+    # No retraining or ML logic modification.
+    result = predict_health()
 
     return result
