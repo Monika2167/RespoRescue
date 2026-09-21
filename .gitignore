@@ -3,3 +3,7 @@ venv/
 __pycache__/
 *.pyc
 data/graph/impact_propagation.csv
+data/graph/what_if_simulation.csv
+data/graph/root_cause_candidates.csv
+data/graph/impact_analysis.csv
+data/graph/what_if_scenarios.csv
