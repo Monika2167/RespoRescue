@@ -2,8 +2,18 @@
 venv/
 __pycache__/
 *.pyc
+<<<<<<< HEAD
 data/graph/impact_propagation.csv
 data/graph/what_if_simulation.csv
 data/graph/root_cause_candidates.csv
 data/graph/impact_analysis.csv
 data/graph/what_if_scenarios.csv
+=======
+<<<<<<< HEAD
+# Local SQLite database
+reporescue.db
+
+=======
+data/graph/impact_propagation.csv
+>>>>>>> origin/member2-graph
+>>>>>>> origin/master
