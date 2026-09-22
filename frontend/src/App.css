@@ -1,7 +1,8 @@
 body {
   margin: 0;
   font-family: Arial, sans-serif;
-  background: #f5f7fb;
+  background: #080d1a;
+  color: #f8fafc;
 }
 
 #root {
@@ -64,6 +65,7 @@ body {
 
 .card {
   background: white;
+  color: #111827;
   padding: 25px;
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
@@ -71,6 +73,33 @@ body {
 
 .card h3 {
   margin-top: 0;
+  color: #111827;
+}
+
+.card h2 {
+  color: #111827;
+}
+
+.card p {
+  color: #374151;
+}
+
+.card strong {
+  color: #111827;
+}
+
+input {
+  background: white;
+  color: #111827;
+  border: 1px solid #cbd5e1;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+
+input::placeholder {
+  color: #6b7280;
 }
 
 .button {

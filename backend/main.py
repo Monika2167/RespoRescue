@@ -1,3 +1,4 @@
+
 from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException
@@ -255,6 +256,39 @@ def login(
         access_token=access_token,
         token_type="bearer"
     )
+
+
+# =========================================================
+# CURRENT AUTHENTICATED USER
+# JWT PROTECTED
+# =========================================================
+
+@app.get("/auth/me")
+def get_current_user_profile(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+
+    user = (
+        db.query(User)
+        .filter(
+            User.id == current_user["user_id"]
+        )
+        .first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    return {
+        "success": True,
+        "user_id": user.id,
+        "username": user.username,
+        "email": user.email
+    }
 
 
 # =========================================================
@@ -548,28 +582,100 @@ def predict_pull_request(
     current_user: dict = Depends(get_current_user)
 ):
 
-    # Existing Member 1 ML logic
     result = predict_pr(pr_number)
 
     if not result["success"]:
-        result["pr_number"] = pr_number
+        raise HTTPException(
+            status_code=400,
+            detail=result.get(
+                "error",
+                "Prediction failed"
+            )
+        )
 
-    return result
+    return PredictionResponse(
+        success=True,
+        pr_number=pr_number,
+
+        probability=result.get(
+            "probability"
+        ),
+
+        probability_percent=result.get(
+            "probability_percent"
+        ),
+
+        prediction=result.get(
+            "prediction"
+        ),
+
+        threshold=result.get(
+            "threshold"
+        ),
+
+        top_evidence=result.get(
+            "top_evidence",
+            []
+        ),
+
+        semantic_signal=result.get(
+            "semantic_signal"
+        ),
+
+        semantic_strength=result.get(
+            "semantic_strength"
+        )
+    )
 
 
 # =========================================================
-# REPOSITORY HEALTH FORECAST
-# EXISTING MEMBER 1 HEALTH FORECAST MODEL
+# HEALTH FORECAST
+# JWT PROTECTED
 # =========================================================
 
 @app.get(
     "/health-forecast",
     response_model=HealthForecastResponse
 )
-def repository_health_forecast():
+def health_forecast(
+    current_user: dict = Depends(get_current_user)
+):
 
-    # Use the existing trained Health Forecast model.
-    # No retraining or ML logic modification.
     result = predict_health()
 
-    return result
+    if not isinstance(result, dict):
+        raise HTTPException(
+            status_code=500,
+            detail="Health forecast failed"
+        )
+
+    if not result.get("success", False):
+        raise HTTPException(
+            status_code=400,
+            detail=result.get(
+                "error",
+                "Health forecast failed"
+            )
+        )
+
+    return HealthForecastResponse(
+        success=True,
+        date=result.get("date"),
+        forecast=result.get("forecast"),
+        forecast_unit=result.get("forecast_unit"),
+        current_open_pr_backlog=result.get(
+            "current_open_pr_backlog"
+        ),
+        current_open_issue_backlog=result.get(
+            "current_open_issue_backlog"
+        ),
+        model=result.get("model"),
+        alpha=result.get("alpha"),
+        feature_count=result.get("feature_count"),
+        features=result.get(
+            "features",
+            []
+        ),
+        error=result.get("error")
+    )
+

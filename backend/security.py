@@ -1,20 +1,44 @@
+
+import os
 from datetime import datetime, timedelta, timezone
 
+from dotenv import load_dotenv
 from jose import jwt, JWTError
 from fastapi import HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 
-# Development secret key
-# Production-la environment variable use pannuvom
-SECRET_KEY = "reporescue-development-secret-key-change-later"
+# =========================================================
+# ENVIRONMENT CONFIGURATION
+# =========================================================
 
-ALGORITHM = "HS256"
+# Load environment variables from scripts/.env
+load_dotenv("scripts/.env")
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+# JWT secret must be provided through environment variables.
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+
+if not SECRET_KEY:
+    raise RuntimeError(
+        "JWT_SECRET_KEY is not configured. "
+        "Add JWT_SECRET_KEY to scripts/.env"
+    )
+
+
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+
+ACCESS_TOKEN_EXPIRE_MINUTES = int(
+    os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "60")
+)
+
 
 security = HTTPBearer()
 
+
+# =========================================================
+# CREATE JWT ACCESS TOKEN
+# =========================================================
 
 def create_access_token(user_id: int, email: str):
     expire = datetime.now(timezone.utc) + timedelta(
@@ -36,6 +60,10 @@ def create_access_token(user_id: int, email: str):
     return token
 
 
+# =========================================================
+# VERIFY JWT ACCESS TOKEN
+# =========================================================
+
 def verify_access_token(token: str):
     try:
         payload = jwt.decode(
@@ -55,9 +83,13 @@ def verify_access_token(token: str):
             "email": email
         }
 
-    except (JWTError, ValueError):
+    except (JWTError, ValueError, TypeError):
         return None
 
+
+# =========================================================
+# GET CURRENT AUTHENTICATED USER
+# =========================================================
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security)
@@ -73,3 +105,4 @@ def get_current_user(
         )
 
     return user
+

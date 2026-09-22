@@ -14,7 +14,7 @@ from backend.models import User, GitHubConnection, Repository
 from backend.security import (
     SECRET_KEY,
     ALGORITHM,
-    get_current_user
+    get_current_user,
 )
 
 
@@ -22,7 +22,13 @@ from backend.security import (
 # LOAD ENVIRONMENT VARIABLES
 # =========================================================
 
-load_dotenv()
+# github_oauth.py is inside backend/
+# .env is inside scripts/
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ENV_PATH = os.path.join(BASE_DIR, "scripts", ".env")
+
+load_dotenv(ENV_PATH)
+
 
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
@@ -53,24 +59,50 @@ router = APIRouter(
 
 
 # =========================================================
-# GITHUB LOGIN
+# HELPER - GITHUB HEADERS
 # =========================================================
 
-@router.get("/login")
-def github_login(token: str):
+def github_headers(access_token: str) -> dict:
+    return {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "RepoRescue",
+    }
 
+
+# =========================================================
+# HELPER - CHECK CONFIGURATION
+# =========================================================
+
+def ensure_github_oauth_configured():
     if not GITHUB_CLIENT_ID:
         raise HTTPException(
             status_code=500,
             detail="GitHub Client ID is not configured"
         )
 
+    if not GITHUB_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=500,
+            detail="GitHub Client Secret is not configured"
+        )
+
+
+# =========================================================
+# GITHUB LOGIN
+# =========================================================
+
+@router.get("/login")
+def github_login(token: str):
+
+    ensure_github_oauth_configured()
+
     # -----------------------------------------------------
     # Decode RepoRescue JWT
     # -----------------------------------------------------
 
     try:
-
         payload = jwt.decode(
             token,
             SECRET_KEY,
@@ -86,7 +118,6 @@ def github_login(token: str):
             )
 
     except JWTError:
-
         raise HTTPException(
             status_code=401,
             detail="Invalid authentication token"
@@ -143,17 +174,7 @@ async def github_callback(
     db: Session = Depends(get_db)
 ):
 
-    if (
-        not GITHUB_CLIENT_ID
-        or not GITHUB_CLIENT_SECRET
-    ):
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "GitHub OAuth credentials "
-                "are not configured"
-            )
-        )
+    ensure_github_oauth_configured()
 
     # -----------------------------------------------------
     # Validate OAuth State
@@ -168,7 +189,6 @@ async def github_callback(
         )
 
         if payload.get("purpose") != "github_oauth":
-
             raise HTTPException(
                 status_code=400,
                 detail="Invalid OAuth state"
@@ -177,14 +197,12 @@ async def github_callback(
         user_id = payload.get("user_id")
 
         if not user_id:
-
             raise HTTPException(
                 status_code=400,
                 detail="Invalid OAuth state user"
             )
 
     except JWTError:
-
         raise HTTPException(
             status_code=400,
             detail="Invalid or expired OAuth state"
@@ -203,7 +221,6 @@ async def github_callback(
     )
 
     if not user:
-
         raise HTTPException(
             status_code=404,
             detail="RepoRescue user not found"
@@ -220,14 +237,25 @@ async def github_callback(
         "redirect_uri": GITHUB_REDIRECT_URI
     }
 
-    async with httpx.AsyncClient() as client:
+    try:
 
-        token_response = await client.post(
-            GITHUB_TOKEN_URL,
-            data=token_data,
-            headers={
-                "Accept": "application/json"
-            }
+        async with httpx.AsyncClient(
+            timeout=20.0
+        ) as client:
+
+            token_response = await client.post(
+                GITHUB_TOKEN_URL,
+                data=token_data,
+                headers={
+                    "Accept": "application/json"
+                }
+            )
+
+    except httpx.RequestError as exc:
+
+        raise HTTPException(
+            status_code=502,
+            detail=f"GitHub token request failed: {str(exc)}"
         )
 
     if token_response.status_code != 200:
@@ -235,12 +263,22 @@ async def github_callback(
         raise HTTPException(
             status_code=400,
             detail=(
-                "Failed to exchange "
-                "GitHub authorization code"
+                "Failed to exchange GitHub authorization code. "
+                f"GitHub status: {token_response.status_code}"
             )
         )
 
     token_json = token_response.json()
+
+    # GitHub may return an error object even with HTTP 200
+    if token_json.get("error"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "GitHub OAuth error: "
+                f"{token_json.get('error_description', token_json.get('error'))}"
+            )
+        )
 
     access_token = token_json.get(
         "access_token"
@@ -250,45 +288,50 @@ async def github_callback(
 
         raise HTTPException(
             status_code=400,
-            detail=(
-                "GitHub access token "
-                "was not received"
-            )
+            detail="GitHub access token was not received"
         )
 
     # -----------------------------------------------------
     # Get GitHub User Information
     # -----------------------------------------------------
 
-    github_headers = {
-        "Authorization": (
-            f"Bearer {access_token}"
-        ),
-        "Accept": (
-            "application/vnd.github+json"
-        )
-    }
+    headers = github_headers(access_token)
 
-    async with httpx.AsyncClient() as client:
+    try:
 
-        github_user_response = await client.get(
-            f"{GITHUB_API_URL}/user",
-            headers=github_headers
+        async with httpx.AsyncClient(
+            timeout=20.0
+        ) as client:
+
+            github_user_response = await client.get(
+                f"{GITHUB_API_URL}/user",
+                headers=headers
+            )
+
+    except httpx.RequestError as exc:
+
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to contact GitHub: {str(exc)}"
         )
 
     if github_user_response.status_code != 200:
 
+        try:
+            github_error = github_user_response.json()
+        except Exception:
+            github_error = {}
+
         raise HTTPException(
             status_code=400,
             detail=(
-                "Failed to retrieve "
-                "GitHub user"
-            )
+                "Failed to retrieve GitHub user. "
+                f"GitHub status: {github_user_response.status_code}. "
+                f"{github_error.get('message', '')}"
+            ).strip()
         )
 
-    github_user = (
-        github_user_response.json()
-    )
+    github_user = github_user_response.json()
 
     github_user_id = str(
         github_user.get("id")
@@ -305,9 +348,7 @@ async def github_callback(
 
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Invalid GitHub user information"
-            )
+            detail="Invalid GitHub user information"
         )
 
     # -----------------------------------------------------
@@ -356,10 +397,6 @@ async def github_callback(
     # -----------------------------------------------------
     # Redirect back to Frontend
     # -----------------------------------------------------
-    #
-    # GitHub OAuth success → RepoRescue frontend
-    #
-    # -----------------------------------------------------
 
     frontend_url = (
         "http://localhost:5174"
@@ -406,50 +443,146 @@ async def get_github_repositories(
             detail="GitHub account is not connected"
         )
 
-    # -----------------------------------------------------
-    # GitHub Headers
-    # -----------------------------------------------------
+    access_token = connection.access_token
 
-    github_headers = {
-        "Authorization": (
-            f"Bearer {connection.access_token}"
-        ),
-        "Accept": (
-            "application/vnd.github+json"
+    if not access_token:
+
+        raise HTTPException(
+            status_code=401,
+            detail="GitHub access token is missing"
         )
-    }
+
+    headers = github_headers(
+        access_token
+    )
 
     # -----------------------------------------------------
     # Get Authorized Repositories
     # -----------------------------------------------------
 
-    async with httpx.AsyncClient() as client:
+    repositories = []
 
-        response = await client.get(
-            f"{GITHUB_API_URL}/user/repos",
-            headers=github_headers,
-            params={
-                "visibility": "all",
-                "affiliation": (
-                    "owner,collaborator,"
-                    "organization_member"
-                ),
-                "sort": "updated",
-                "per_page": 100
-            }
-        )
+    page = 1
 
-    if response.status_code != 200:
+    try:
+
+        async with httpx.AsyncClient(
+            timeout=30.0
+        ) as client:
+
+            while True:
+
+                response = await client.get(
+                    f"{GITHUB_API_URL}/user/repos",
+                    headers=headers,
+                    params={
+                        "visibility": "all",
+                        "affiliation": (
+                            "owner,collaborator,"
+                            "organization_member"
+                        ),
+                        "sort": "updated",
+                        "direction": "desc",
+                        "per_page": 100,
+                        "page": page
+                    }
+                )
+
+                # -------------------------------------------------
+                # Invalid / expired GitHub token
+                # -------------------------------------------------
+
+                if response.status_code == 401:
+
+                    raise HTTPException(
+                        status_code=401,
+                        detail=(
+                            "GitHub authorization has expired "
+                            "or the access token is invalid. "
+                            "Please reconnect your GitHub account."
+                        )
+                    )
+
+                # -------------------------------------------------
+                # Forbidden / permission problem
+                # -------------------------------------------------
+
+                if response.status_code == 403:
+
+                    try:
+                        github_error = response.json()
+                    except Exception:
+                        github_error = {}
+
+                    raise HTTPException(
+                        status_code=403,
+                        detail=(
+                            "GitHub denied repository access. "
+                            f"{github_error.get('message', 'Permission denied')}"
+                        )
+                    )
+
+                # -------------------------------------------------
+                # Other GitHub API errors
+                # -------------------------------------------------
+
+                if response.status_code != 200:
+
+                    try:
+                        github_error = response.json()
+                    except Exception:
+                        github_error = {}
+
+                    raise HTTPException(
+                        status_code=502,
+                        detail=(
+                            "GitHub repository request failed. "
+                            f"GitHub status: {response.status_code}. "
+                            f"{github_error.get('message', 'Unknown GitHub error')}"
+                        )
+                    )
+
+                page_repositories = response.json()
+
+                if not isinstance(
+                    page_repositories,
+                    list
+                ):
+                    raise HTTPException(
+                        status_code=502,
+                        detail=(
+                            "GitHub returned an unexpected "
+                            "repository response"
+                        )
+                    )
+
+                repositories.extend(
+                    page_repositories
+                )
+
+                # GitHub returned fewer than 100,
+                # therefore this is the final page.
+                if len(page_repositories) < 100:
+                    break
+
+                page += 1
+
+                # Safety limit
+                if page > 20:
+                    break
+
+    except HTTPException:
+        raise
+
+    except httpx.RequestError as exc:
 
         raise HTTPException(
-            status_code=400,
+            status_code=502,
             detail=(
-                "Failed to retrieve "
-                "GitHub repositories"
+                "Unable to connect to GitHub: "
+                f"{str(exc)}"
             )
         )
-
-    repositories = response.json()
 
     # -----------------------------------------------------
     # Safe Repository Response
@@ -459,32 +592,40 @@ async def get_github_repositories(
 
     for repo in repositories:
 
-        repo_list.append({
+        repo_list.append(
+            {
+                "id": repo.get("id"),
 
-            "id": repo.get("id"),
+                "name": repo.get(
+                    "name"
+                ),
 
-            "name": repo.get("name"),
+                "full_name": repo.get(
+                    "full_name"
+                ),
 
-            "full_name": repo.get(
-                "full_name"
-            ),
+                "private": repo.get(
+                    "private"
+                ),
 
-            "private": repo.get(
-                "private"
-            ),
+                "html_url": repo.get(
+                    "html_url"
+                ),
 
-            "html_url": repo.get(
-                "html_url"
-            ),
-
-            "owner": (
-                repo.get("owner", {})
-                .get("login")
-            )
-        })
+                "owner": (
+                    repo.get(
+                        "owner",
+                        {}
+                    ).get(
+                        "login"
+                    )
+                )
+            }
+        )
 
     return {
         "github_connected": True,
+        "total_repositories": len(repo_list),
         "repositories": repo_list
     }
 
@@ -525,42 +666,68 @@ async def select_repository(
             detail="GitHub account is not connected"
         )
 
-    # -----------------------------------------------------
-    # GitHub Access Token
-    # -----------------------------------------------------
+    access_token = connection.access_token
 
-    access_token = (
-        connection.access_token
-    )
+    if not access_token:
 
-    github_headers = {
-        "Authorization": (
-            f"Bearer {access_token}"
-        ),
-        "Accept": (
-            "application/vnd.github+json"
+        raise HTTPException(
+            status_code=401,
+            detail="GitHub access token is missing"
         )
-    }
+
+    headers = github_headers(
+        access_token
+    )
 
     # -----------------------------------------------------
     # Verify Repository Access
     # -----------------------------------------------------
 
-    async with httpx.AsyncClient() as client:
+    try:
 
-        repo_response = await client.get(
-            f"{GITHUB_API_URL}/repositories/{github_repo_id}",
-            headers=github_headers
+        async with httpx.AsyncClient(
+            timeout=20.0
+        ) as client:
+
+            repo_response = await client.get(
+                f"{GITHUB_API_URL}/repositories/{github_repo_id}",
+                headers=headers
+            )
+
+    except httpx.RequestError as exc:
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Unable to connect to GitHub: "
+                f"{str(exc)}"
+            )
+        )
+
+    if repo_response.status_code == 401:
+
+        raise HTTPException(
+            status_code=401,
+            detail=(
+                "GitHub authorization has expired "
+                "or the access token is invalid"
+            )
         )
 
     if repo_response.status_code != 200:
 
+        try:
+            github_error = repo_response.json()
+        except Exception:
+            github_error = {}
+
         raise HTTPException(
             status_code=403,
             detail=(
-                "Repository is not accessible "
-                "by the connected GitHub account"
-            )
+                "Repository is not accessible by the "
+                "connected GitHub account. "
+                f"{github_error.get('message', '')}"
+            ).strip()
         )
 
     repo = repo_response.json()
@@ -569,26 +736,37 @@ async def select_repository(
     # Repository Information
     # -----------------------------------------------------
 
-    repo_name = repo.get("name")
+    repo_name = repo.get(
+        "name"
+    )
 
-    repo_url = repo.get("html_url")
+    repo_url = repo.get(
+        "html_url"
+    )
 
     repo_owner = (
-        repo.get("owner", {})
-        .get("login")
+        repo.get(
+            "owner",
+            {}
+        ).get(
+            "login"
+        )
+    )
+
+    repo_full_name = repo.get(
+        "full_name"
     )
 
     if (
         not repo_name
         or not repo_url
         or not repo_owner
+        or not repo_full_name
     ):
 
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Invalid repository information"
-            )
+            detail="Invalid repository information"
         )
 
     # -----------------------------------------------------
@@ -627,32 +805,31 @@ async def select_repository(
     # -----------------------------------------------------
 
     return {
+        "success": True,
 
         "message": (
             "Repository selected successfully"
         ),
 
         "repository": {
-
             "id": repository.id,
 
             "name": repository.name,
 
-            "github_url": (
-                repository.github_url
-            ),
+            "github_url": repository.github_url,
 
             "github_owner": repo_owner,
+
+            "github_full_name": repo_full_name,
 
             "owner_id": repository.owner_id
         },
 
         "workspace": {
-
             "repository_id": repository.id,
 
-            "repository_name": (
-                repository.name
-            )
+            "repository_name": repository.name,
+
+            "github_full_name": repo_full_name
         }
     }
