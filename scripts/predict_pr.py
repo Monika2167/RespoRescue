@@ -1,653 +1,803 @@
-import os
+from pathlib import Path
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
 import joblib
 import numpy as np
 import pandas as pd
-
-
-# ============================================================
-# REPORESCUE - REUSABLE PR PREDICTION
-# ============================================================
-
-BASE_DIR = os.path.dirname(
-    os.path.dirname(os.path.abspath(__file__))
-)
+import requests
+from sentence_transformers import SentenceTransformer
 
 
 # ============================================================
 # PATHS
 # ============================================================
 
-MODEL_DIR = os.path.join(
-    BASE_DIR,
-    "data",
-    "ml",
-    "model_artifacts"
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+MODEL_PATH = (
+    BASE_DIR
+    / "data"
+    / "ml"
+    / "model_artifacts"
+    / "combined_logistic_regression.joblib"
 )
 
-MODEL_PATH = os.path.join(
-    MODEL_DIR,
-    "combined_logistic_regression.joblib"
+SCALER_PATH = (
+    BASE_DIR
+    / "data"
+    / "ml"
+    / "model_artifacts"
+    / "structured_scaler.joblib"
 )
 
-SCALER_PATH = os.path.join(
-    MODEL_DIR,
-    "structured_scaler.joblib"
+FEATURES_PATH = (
+    BASE_DIR
+    / "data"
+    / "ml"
+    / "model_artifacts"
+    / "model_features.joblib"
 )
 
-FEATURES_PATH = os.path.join(
-    MODEL_DIR,
-    "model_features.joblib"
+CONFIG_PATH = (
+    BASE_DIR
+    / "data"
+    / "ml"
+    / "model_artifacts"
+    / "model_config.joblib"
 )
 
-CONFIG_PATH = os.path.join(
-    MODEL_DIR,
-    "model_config.joblib"
-)
 
-PREDICTION_FEATURE_PATH = os.path.join(
-    BASE_DIR,
-    "data",
-    "features",
-    "pr_24h_prediction_features.csv"
-)
+# ============================================================
+# GITHUB API
+# ============================================================
 
-EMBEDDING_PATH = os.path.join(
-    BASE_DIR,
-    "data",
-    "nlp",
-    "embeddings",
-    "pr_text_embeddings.npy"
-)
+GITHUB_API_URL = "https://api.github.com"
 
-EMBEDDING_MAP_PATH = os.path.join(
-    BASE_DIR,
-    "data",
-    "nlp",
-    "embeddings",
-    "embedding_pr_numbers.csv"
-)
+GITHUB_HEADERS_BASE = {
+    "Accept": "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+}
 
 
 # ============================================================
 # LOAD MODEL ARTIFACTS
 # ============================================================
 
-print("Loading RepoRescue ML model...")
+model = joblib.load(MODEL_PATH)
+scaler = joblib.load(SCALER_PATH)
+structured_features = joblib.load(FEATURES_PATH)
+config = joblib.load(CONFIG_PATH)
 
-model = joblib.load(
-    MODEL_PATH
+threshold = float(config["threshold"])
+
+
+# ============================================================
+# LOAD EMBEDDING MODEL
+# ============================================================
+
+embedding_model = SentenceTransformer(
+    "all-MiniLM-L6-v2"
 )
 
-scaler = joblib.load(
-    SCALER_PATH
-)
 
-structured_features = joblib.load(
-    FEATURES_PATH
-)
+# ============================================================
+# EXPECTED FEATURES
+# ============================================================
 
-config = joblib.load(
-    CONFIG_PATH
-)
-
-threshold = config[
-    "threshold"
+EXPECTED_FEATURES = [
+    "title_length",
+    "body_length",
+    "title_word_count",
+    "body_word_count",
+    "is_draft",
+    "commits_24h",
+    "commit_authors_24h",
+    "files_changed_24h",
+    "additions_24h",
+    "deletions_24h",
+    "total_changes_24h",
+    "changes_per_commit_24h",
+    "files_per_commit_24h",
+    "deletion_ratio_24h",
+    "has_commit_activity_24h",
+    "has_file_activity_24h",
 ]
 
 
 # ============================================================
-# LOAD PREDICTION DATA
+# GITHUB HELPERS
 # ============================================================
 
-prediction_features = pd.read_csv(
-    PREDICTION_FEATURE_PATH
-)
-
-prediction_features[
-    "pr_number"
-] = prediction_features[
-    "pr_number"
-].astype(int)
+def github_headers(access_token: str):
+    return {
+        **GITHUB_HEADERS_BASE,
+        "Authorization": f"Bearer {access_token}",
+    }
 
 
-# ============================================================
-# LOAD EMBEDDINGS
-# ============================================================
-
-embeddings = np.load(
-    EMBEDDING_PATH
-)
-
-embedding_map = pd.read_csv(
-    EMBEDDING_MAP_PATH
-)
-
-embedding_map[
-    "pr_number"
-] = embedding_map[
-    "pr_number"
-].astype(int)
-
-
-embedding_lookup = {
-    int(pr): embeddings[i]
-    for i, pr in enumerate(
-        embedding_map["pr_number"]
-    )
-}
-
-
-# ============================================================
-# FEATURE NAME MAPPING
-# ============================================================
-
-FEATURE_NAMES = {
-
-    "title_length":
-        "Title length",
-
-    "body_length":
-        "Description length",
-
-    "title_word_count":
-        "Number of title words",
-
-    "body_word_count":
-        "Number of description words",
-
-    "is_draft":
-        "Draft status",
-
-    "commits_24h":
-        "Commits in first 24 hours",
-
-    "commit_authors_24h":
-        "Contributing developers in first 24 hours",
-
-    "files_changed_24h":
-        "Files changed in first 24 hours",
-
-    "additions_24h":
-        "Lines added in first 24 hours",
-
-    "deletions_24h":
-        "Lines deleted in first 24 hours",
-
-    "total_changes_24h":
-        "Total code changes in first 24 hours",
-
-    "changes_per_commit_24h":
-        "Changes per commit",
-
-    "files_per_commit_24h":
-        "Files per commit",
-
-    "deletion_ratio_24h":
-        "Deletion ratio",
-
-    "has_commit_activity_24h":
-        "Commit activity during first 24 hours",
-
-    "has_file_activity_24h":
-        "File activity during first 24 hours"
-}
-
-
-# ============================================================
-# PREDICTION FUNCTION
-# ============================================================
-
-def predict_pr(pr_number):
-
-    """
-    Predict whether a PR is a potential
-    future maintenance bottleneck.
-
-    Returns a dictionary containing:
-    - PR number
-    - probability
-    - prediction
-    - threshold
-    - top model evidence
-    - semantic signal
-    """
-
-
-    # --------------------------------------------------------
-    # Find PR
-    # --------------------------------------------------------
-
-    pr_data = prediction_features[
-        prediction_features[
-            "pr_number"
-        ] == int(pr_number)
-    ]
-
-
-    if pr_data.empty:
-
-        return {
-            "success": False,
-            "error":
-                "No 24-hour prediction data available "
-                f"for PR #{pr_number}."
-        }
-
-
-    row = pr_data.iloc[0]
-
-
-    # --------------------------------------------------------
-    # Check embedding
-    # --------------------------------------------------------
-
-    if int(pr_number) not in embedding_lookup:
-
-        return {
-            "success": False,
-            "error":
-                "Embedding not found "
-                f"for PR #{pr_number}."
-        }
-
-
-    # --------------------------------------------------------
-    # Structured features
-    # --------------------------------------------------------
-
-    structured = row[
-        structured_features
-    ].values.astype(
-        float
-    ).reshape(
-        1, -1
+def github_get(
+    url: str,
+    access_token: str,
+    params: Optional[dict] = None,
+):
+    response = requests.get(
+        url,
+        headers=github_headers(access_token),
+        params=params,
+        timeout=30,
     )
 
-
-    structured_scaled = (
-        scaler.transform(
-            structured
-        )
-    )
-
-
-    # --------------------------------------------------------
-    # Semantic embedding
-    # --------------------------------------------------------
-
-    embedding = embedding_lookup[
-        int(pr_number)
-    ].reshape(
-        1, -1
-    )
-
-
-    # --------------------------------------------------------
-    # Combine
-    # --------------------------------------------------------
-
-    X = np.hstack([
-        structured_scaled,
-        embedding
-    ])
-
-
-    # --------------------------------------------------------
-    # Probability
-    # --------------------------------------------------------
-
-    probability = model.predict_proba(
-        X
-    )[0, 1]
-
-
-    # --------------------------------------------------------
-    # Classification
-    # --------------------------------------------------------
-
-    prediction = int(
-        probability >= threshold
-    )
-
-
-    if prediction == 1:
-
-        label = (
-            "Potential Bottleneck"
-        )
-
-    else:
-
-        label = (
-            "Lower Bottleneck Risk"
-        )
-
-
-    # ========================================================
-    # STRUCTURED FEATURE CONTRIBUTIONS
-    # ========================================================
-
-    coefficients = model.coef_[0]
-
-    structured_coefficients = (
-        coefficients[
-            :len(structured_features)
-        ]
-    )
-
-
-    contributions = []
-
-
-    for i, feature in enumerate(
-        structured_features
-    ):
-
-        contribution = (
-            structured_scaled[0, i]
-            *
-            structured_coefficients[i]
-        )
-
-
-        contributions.append({
-
-            "feature":
-                feature,
-
-            "feature_name":
-                FEATURE_NAMES.get(
-                    feature,
-                    feature
-                ),
-
-            "value":
-                float(row[feature]),
-
-            "coefficient":
-                float(
-                    structured_coefficients[i]
-                ),
-
-            "contribution":
-                float(
-                    contribution
-                )
-
-        })
-
-
-    contributions = sorted(
-        contributions,
-        key=lambda x:
-            abs(x["contribution"]),
-        reverse=True
-    )
-
-
-    # --------------------------------------------------------
-    # Top 6 evidence
-    # --------------------------------------------------------
-
-    top_evidence = []
-
-
-    for item in contributions:
-
-        contribution = (
-            item["contribution"]
-        )
-
-        if abs(contribution) < 0.03:
-
-            continue
-
-
-        feature = item[
-            "feature"
-        ]
-
-        value = item[
-            "value"
-        ]
-
-
-        # ----------------------------------------------------
-        # Binary features
-        # ----------------------------------------------------
-
-        if feature == "is_draft":
-
-            if value == 1:
-
-                description = (
-                    "PR is marked as a draft"
-                )
-
-            else:
-
-                description = (
-                    "PR is not marked as a draft"
-                )
-
-
-        elif feature == "has_commit_activity_24h":
-
-            if value == 1:
-
-                description = (
-                    "Commit activity was observed "
-                    "during the first 24 hours"
-                )
-
-            else:
-
-                description = (
-                    "No commit activity was observed "
-                    "during the first 24 hours"
-                )
-
-
-        elif feature == "has_file_activity_24h":
-
-            if value == 1:
-
-                description = (
-                    "File activity was observed "
-                    "during the first 24 hours"
-                )
-
-            else:
-
-                description = (
-                    "No file activity was observed "
-                    "during the first 24 hours"
-                )
-
-
-        # ----------------------------------------------------
-        # Numerical features
-        # ----------------------------------------------------
-
-        else:
-
-            if feature == (
-                "deletion_ratio_24h"
-            ):
-
-                value_text = (
-                    f"{value:.2%}"
-                )
-
-            elif float(value).is_integer():
-
-                value_text = (
-                    f"{int(value)}"
-                )
-
-            else:
-
-                value_text = (
-                    f"{value:.2f}"
-                )
-
-
-            description = (
-                f"{FEATURE_NAMES.get(feature, feature)} "
-                f"= {value_text}"
+    if response.status_code >= 400:
+        try:
+            detail = response.json().get(
+                "message",
+                response.text,
             )
+        except Exception:
+            detail = response.text
+
+        raise RuntimeError(
+            f"GitHub API error {response.status_code}: {detail}"
+        )
+
+    return response.json()
 
 
-        # ----------------------------------------------------
-        # Direction
-        # ----------------------------------------------------
+# ============================================================
+# PARSE REPOSITORY
+# ============================================================
 
-        if contribution > 0:
+def normalize_repo_name(repo_full_name: str) -> str:
 
-            direction = "higher"
+    if not repo_full_name:
+        raise ValueError(
+            "GitHub repository name is required."
+        )
 
-        else:
+    repo_full_name = repo_full_name.strip()
 
-            direction = "lower"
+    if repo_full_name.startswith(
+        "https://github.com/"
+    ):
+        repo_full_name = repo_full_name[
+            len("https://github.com/"):
+        ]
+
+    elif repo_full_name.startswith(
+        "http://github.com/"
+    ):
+        repo_full_name = repo_full_name[
+            len("http://github.com/"):
+        ]
+
+    repo_full_name = repo_full_name.rstrip("/")
+
+    if repo_full_name.endswith(".git"):
+        repo_full_name = repo_full_name[:-4]
+
+    parts = repo_full_name.split("/")
+
+    if len(parts) != 2:
+        raise ValueError(
+            "Invalid GitHub repository. "
+            "Expected owner/repository."
+        )
+
+    owner, repo = parts
+
+    if not owner or not repo:
+        raise ValueError(
+            "Invalid GitHub repository."
+        )
+
+    return f"{owner}/{repo}"
 
 
-        top_evidence.append({
+# ============================================================
+# FETCH PR + FIRST 24-HOUR ACTIVITY
+# ============================================================
 
-            "feature":
-                feature,
+def fetch_pr_data(
+    repo_full_name: str,
+    pr_number: int,
+    access_token: str,
+):
 
-            "description":
-                description,
+    repo_full_name = normalize_repo_name(
+        repo_full_name
+    )
 
-            "contribution":
-                round(
-                    float(contribution),
-                    6
-                ),
+    pr_number = int(pr_number)
 
-            "direction":
-                direction,
+    if pr_number <= 0:
+        raise ValueError(
+            "PR number must be greater than zero."
+        )
 
-            "explanation":
-                (
-                    f"{description}; "
-                    f"this feature pushed the model "
-                    f"toward {direction} bottleneck risk."
-                )
+    # --------------------------------------------------------
+    # PR
+    # --------------------------------------------------------
 
-        })
+    pr_url = (
+        f"{GITHUB_API_URL}/repos/"
+        f"{repo_full_name}/pulls/{pr_number}"
+    )
 
+    pr = github_get(
+        pr_url,
+        access_token,
+    )
 
-        if len(top_evidence) >= 6:
+    created_at_text = pr.get("created_at")
 
+    if not created_at_text:
+        raise RuntimeError(
+            "GitHub PR does not contain created_at."
+        )
+
+    created_at = datetime.fromisoformat(
+        created_at_text.replace(
+            "Z",
+            "+00:00",
+        )
+    )
+
+    cutoff = created_at + timedelta(
+        hours=24
+    )
+
+    title = pr.get("title") or ""
+    body = pr.get("body") or ""
+
+    # --------------------------------------------------------
+    # COMMITS
+    # --------------------------------------------------------
+
+    commit_rows = []
+
+    page = 1
+
+    while True:
+
+        commits_url = (
+            f"{GITHUB_API_URL}/repos/"
+            f"{repo_full_name}/pulls/"
+            f"{pr_number}/commits"
+        )
+
+        page_data = github_get(
+            commits_url,
+            access_token,
+            params={
+                "per_page": 100,
+                "page": page,
+            },
+        )
+
+        if not page_data:
             break
 
+        for commit in page_data:
 
-    # ========================================================
-    # SEMANTIC SIGNAL
-    # ========================================================
+            commit_sha = commit.get("sha")
 
-    embedding_start = len(
-        structured_features
-    )
-
-
-    embedding_contributions = (
-        coefficients[
-            embedding_start:
-        ]
-        *
-        embedding[0]
-    )
-
-
-    semantic_strength = float(
-        np.sum(
-            embedding_contributions
-        )
-    )
-
-
-    if semantic_strength > 0:
-
-        semantic_signal = "positive"
-
-    else:
-
-        semantic_signal = "negative"
-
-
-    # ========================================================
-    # FINAL RESULT
-    # ========================================================
-
-    return {
-
-        "success":
-            True,
-
-        "pr_number":
-            int(pr_number),
-
-        "probability":
-            round(
-                float(probability),
-                6
-            ),
-
-        "probability_percent":
-            round(
-                float(probability * 100),
-                2
-            ),
-
-        "prediction":
-            label,
-
-        "threshold":
-            threshold,
-
-        "top_evidence":
-            top_evidence,
-
-        "semantic_signal":
-            semantic_signal,
-
-        "semantic_strength":
-            round(
-                semantic_strength,
-                6
+            commit_info = commit.get(
+                "commit",
+                {},
             )
 
+            commit_author = commit_info.get(
+                "author"
+            ) or {}
+
+            commit_date_text = (
+                commit_author.get("date")
+            )
+
+            if not commit_date_text:
+                continue
+
+            commit_date = datetime.fromisoformat(
+                commit_date_text.replace(
+                    "Z",
+                    "+00:00",
+                )
+            )
+
+            if commit_date <= cutoff:
+
+                commit_rows.append(
+                    {
+                        "sha": commit_sha,
+                        "author": (
+                            commit.get("author", {})
+                            or {}
+                        ).get(
+                            "login"
+                        )
+                        or commit_author.get(
+                            "name"
+                        )
+                        or "unknown",
+                        "date": commit_date,
+                    }
+                )
+
+        if len(page_data) < 100:
+            break
+
+        page += 1
+
+        # Safety limit
+        if page > 20:
+            break
+
+    # --------------------------------------------------------
+    # UNIQUE COMMITS
+    # --------------------------------------------------------
+
+    unique_commits = {}
+
+    for row in commit_rows:
+
+        sha = row["sha"]
+
+        if sha:
+            unique_commits[sha] = row
+
+    commit_rows = list(
+        unique_commits.values()
+    )
+
+    # --------------------------------------------------------
+    # COMMIT DETAILS
+    # --------------------------------------------------------
+
+    additions = 0
+    deletions = 0
+
+    changed_files = set()
+
+    commit_authors = set()
+
+    for row in commit_rows:
+
+        sha = row["sha"]
+
+        if not sha:
+            continue
+
+        detail_url = (
+            f"{GITHUB_API_URL}/repos/"
+            f"{repo_full_name}/commits/{sha}"
+        )
+
+        detail = github_get(
+            detail_url,
+            access_token,
+        )
+
+        stats = detail.get(
+            "stats",
+            {},
+        )
+
+        additions += int(
+            stats.get(
+                "additions",
+                0,
+            )
+            or 0
+        )
+
+        deletions += int(
+            stats.get(
+                "deletions",
+                0,
+            )
+            or 0
+        )
+
+        for file_info in (
+            detail.get(
+                "files",
+                []
+            )
+            or []
+        ):
+
+            filename = file_info.get(
+                "filename"
+            )
+
+            if filename:
+                changed_files.add(
+                    filename
+                )
+
+        author = row.get(
+            "author"
+        )
+
+        if author:
+            commit_authors.add(
+                author
+            )
+
+    # ========================================================
+    # STRUCTURED FEATURES
+    # ========================================================
+
+    title_words = (
+        title.split()
+        if title.strip()
+        else []
+    )
+
+    body_words = (
+        body.split()
+        if body.strip()
+        else []
+    )
+
+    commits_24h = len(
+        commit_rows
+    )
+
+    commit_authors_24h = len(
+        commit_authors
+    )
+
+    files_changed_24h = len(
+        changed_files
+    )
+
+    total_changes_24h = (
+        additions
+        + deletions
+    )
+
+    changes_per_commit_24h = (
+        total_changes_24h / commits_24h
+        if commits_24h > 0
+        else 0.0
+    )
+
+    files_per_commit_24h = (
+        files_changed_24h / commits_24h
+        if commits_24h > 0
+        else 0.0
+    )
+
+    deletion_ratio_24h = (
+        deletions / total_changes_24h
+        if total_changes_24h > 0
+        else 0.0
+    )
+
+    features = {
+        "title_length": len(title),
+        "body_length": len(body),
+        "title_word_count": len(title_words),
+        "body_word_count": len(body_words),
+        "is_draft": int(
+            bool(
+                pr.get(
+                    "draft",
+                    False
+                )
+            )
+        ),
+        "commits_24h": commits_24h,
+        "commit_authors_24h": commit_authors_24h,
+        "files_changed_24h": files_changed_24h,
+        "additions_24h": additions,
+        "deletions_24h": deletions,
+        "total_changes_24h": total_changes_24h,
+        "changes_per_commit_24h":
+            changes_per_commit_24h,
+        "files_per_commit_24h":
+            files_per_commit_24h,
+        "deletion_ratio_24h":
+            deletion_ratio_24h,
+        "has_commit_activity_24h": int(
+            commits_24h > 0
+        ),
+        "has_file_activity_24h": int(
+            files_changed_24h > 0
+        ),
+    }
+
+    return {
+        "pr": pr,
+        "title": title,
+        "body": body,
+        "created_at": created_at,
+        "features": features,
     }
 
 
 # ============================================================
-# SIMPLE TEST
+# BUILD EMBEDDING
 # ============================================================
 
-if __name__ == "__main__":
+def build_text_embedding(
+    title: str,
+    body: str,
+):
 
-    print("=" * 60)
-    print("REPORESCUE ML PREDICTION MODULE")
-    print("=" * 60)
+    text = (
+        f"{title}\n{body}"
+    ).strip()
 
-    print(
-        f"\n✓ Decision threshold: {threshold}"
+    embedding = embedding_model.encode(
+        [text],
+        normalize_embeddings=True,
+        show_progress_bar=False,
     )
 
-    print(
-        f"✓ Structured features: "
-        f"{len(structured_features)}"
+    return np.asarray(
+        embedding[0],
+        dtype=float,
     )
 
-    print(
-        f"✓ Semantic embedding dimensions: "
-        f"{embeddings.shape[1]}"
-    )
 
-    print(
-        "\n✓ Module is ready for FastAPI integration."
-    )
+# ============================================================
+# PREDICT
+# ============================================================
 
-    print("=" * 60)
+def predict_pr(
+    pr_number: int,
+    repo_full_name: Optional[str] = None,
+    access_token: Optional[str] = None,
+):
+
+    try:
+
+        if not repo_full_name:
+            return {
+                "success": False,
+                "pr_number": int(
+                    pr_number
+                ),
+                "error": (
+                    "GitHub repository is required "
+                    "for live PR prediction."
+                ),
+            }
+
+        if not access_token:
+            return {
+                "success": False,
+                "pr_number": int(
+                    pr_number
+                ),
+                "error": (
+                    "GitHub access token is required "
+                    "for live PR prediction."
+                ),
+            }
+
+        # ----------------------------------------------------
+        # FETCH LIVE DATA
+        # ----------------------------------------------------
+
+        live_data = fetch_pr_data(
+            repo_full_name=repo_full_name,
+            pr_number=pr_number,
+            access_token=access_token,
+        )
+
+        features = live_data[
+            "features"
+        ]
+
+        # ----------------------------------------------------
+        # FEATURE ORDER CHECK
+        # ----------------------------------------------------
+
+        missing = [
+            feature
+            for feature in structured_features
+            if feature not in features
+        ]
+
+        if missing:
+
+            raise RuntimeError(
+                "Missing required model features: "
+                + ", ".join(missing)
+            )
+
+        # ----------------------------------------------------
+        # STRUCTURED VECTOR
+        # ----------------------------------------------------
+
+        structured_vector = np.array(
+            [
+                features[feature]
+                for feature in structured_features
+            ],
+            dtype=float,
+        ).reshape(
+            1,
+            -1,
+        )
+
+        structured_scaled = scaler.transform(
+            structured_vector
+        )
+
+        # ----------------------------------------------------
+        # SEMANTIC EMBEDDING
+        # ----------------------------------------------------
+
+        embedding = build_text_embedding(
+            live_data["title"],
+            live_data["body"],
+        )
+
+        embedding_vector = embedding.reshape(
+            1,
+            -1,
+        )
+
+        # ----------------------------------------------------
+        # FINAL MODEL INPUT
+        # ----------------------------------------------------
+
+        X = np.concatenate(
+            [
+                structured_scaled,
+                embedding_vector,
+            ],
+            axis=1,
+        )
+
+        # ----------------------------------------------------
+        # PREDICTION
+        # ----------------------------------------------------
+
+        probability = float(
+            model.predict_proba(
+                X
+            )[0, 1]
+        )
+
+        prediction = (
+            "Potential Bottleneck"
+            if probability >= threshold
+            else "Low Bottleneck Risk"
+        )
+
+        # ----------------------------------------------------
+        # STRUCTURED EXPLAINABILITY
+        # ----------------------------------------------------
+
+        coefficients = np.asarray(
+            model.coef_[0]
+        )
+
+        scaled_values = (
+            structured_scaled[0]
+        )
+
+        structured_contributions = []
+
+        for index, feature in enumerate(
+            structured_features
+        ):
+
+            contribution = float(
+                scaled_values[index]
+                * coefficients[index]
+            )
+
+            structured_contributions.append(
+                {
+                    "feature": feature,
+                    "contribution": contribution,
+                    "direction": (
+                        "increases bottleneck risk"
+                        if contribution > 0
+                        else "reduces bottleneck risk"
+                    ),
+                }
+            )
+
+        structured_contributions.sort(
+            key=lambda item: abs(
+                item["contribution"]
+            ),
+            reverse=True,
+        )
+
+        top_evidence = (
+            structured_contributions[:6]
+        )
+
+        # ----------------------------------------------------
+        # SEMANTIC CONTRIBUTION
+        # ----------------------------------------------------
+
+        embedding_coefficients = (
+            coefficients[
+                len(structured_features):
+            ]
+        )
+
+        semantic_strength = float(
+            np.dot(
+                embedding,
+                embedding_coefficients,
+            )
+        )
+
+        if semantic_strength > 0:
+            semantic_signal = "Positive"
+        elif semantic_strength < 0:
+            semantic_signal = "Negative"
+        else:
+            semantic_signal = "Neutral"
+
+        # ----------------------------------------------------
+        # RESULT
+        # ----------------------------------------------------
+
+        return {
+            "success": True,
+
+            "repo_full_name": normalize_repo_name(
+                repo_full_name
+            ),
+
+            "pr_number": int(
+                pr_number
+            ),
+
+            "title": live_data[
+                "title"
+            ],
+
+            "author": (
+                live_data["pr"]
+                .get("user", {})
+                or {}
+            ).get(
+                "login"
+            ),
+
+            "created_at": (
+                live_data["created_at"]
+                .isoformat()
+            ),
+
+            "probability": probability,
+
+            "probability_percent": (
+                probability * 100
+            ),
+
+            "prediction": prediction,
+
+            "threshold": threshold,
+
+            "top_evidence": top_evidence,
+
+            "semantic_signal": semantic_signal,
+
+            "semantic_strength": semantic_strength,
+
+            "features": features,
+        }
+
+    except Exception as exc:
+
+        return {
+            "success": False,
+            "pr_number": int(
+                pr_number
+            ),
+            "error": str(exc),
+        }
