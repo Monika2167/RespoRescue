@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
@@ -22,7 +23,10 @@ from backend.security import (
 # LOAD ENVIRONMENT VARIABLES
 # =========================================================
 
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent.parent
+ENV_FILE = BASE_DIR / "scripts" / ".env"
+
+load_dotenv(dotenv_path=ENV_FILE)
 
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
@@ -37,7 +41,8 @@ GITHUB_TOKEN_URL = (
 
 GITHUB_API_URL = "https://api.github.com"
 
-GITHUB_REDIRECT_URI = (
+GITHUB_REDIRECT_URI = os.getenv(
+    "GITHUB_REDIRECT_URI",
     "http://127.0.0.1:8001/auth/github/callback"
 )
 
@@ -355,10 +360,6 @@ async def github_callback(
 
     # -----------------------------------------------------
     # Redirect back to Frontend
-    # -----------------------------------------------------
-    #
-    # GitHub OAuth success → RepoRescue frontend
-    #
     # -----------------------------------------------------
 
     frontend_url = (
