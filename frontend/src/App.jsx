@@ -164,7 +164,6 @@ function App() {
     setAnalysisResult(null);
     setHistory([]);
 
-<<<<<<< HEAD
     setGraphData({
       temporal: [],
       knowledge: [],
@@ -174,10 +173,8 @@ function App() {
       nodes: [],
       edges: [],
     });
-=======
     setHealthForecast(null);
     setHealthForecastError("");
->>>>>>> origin/master
 
     setPage("login");
     setMessage("");
