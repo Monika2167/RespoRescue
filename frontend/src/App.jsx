@@ -155,6 +155,16 @@ function App() {
     setAnalysisResult(null);
     setHistory([]);
 
+    setGraphData({
+      temporal: [],
+      knowledge: [],
+      impact: [],
+      whatIf: [],
+      developerFile: [],
+      nodes: [],
+      edges: [],
+    });
+
     setPage("login");
     setMessage("");
   };
@@ -393,7 +403,9 @@ function App() {
       setAnalysisResult(null);
 
       if (!repositoryId) {
-        setMessage("Please connect a repository first.");
+        setMessage(
+          "Please connect a repository first."
+        );
         return;
       }
 
@@ -410,7 +422,6 @@ function App() {
         "PR analysis completed successfully."
       );
 
-      // Wait for state/repository to be available
       if (repositoryId) {
         await loadHistory();
       }
@@ -456,25 +467,6 @@ function App() {
         data
       );
 
-      /*
-        Backend may return:
-        {
-          history: [...]
-        }
-
-        OR
-
-        {
-          analyses: [...]
-        }
-
-        OR
-
-        {
-          data: [...]
-        }
-      */
-
       let historyData = [];
 
       if (Array.isArray(data)) {
@@ -519,6 +511,13 @@ function App() {
   // =========================
 
   const loadGraphData = async () => {
+    if (!repositoryId) {
+      setGraphMessage(
+        "Please select a repository before loading graph analysis."
+      );
+      return;
+    }
+
     try {
       setGraphLoading(true);
       setGraphMessage("");
@@ -544,7 +543,9 @@ function App() {
       ) {
         try {
           const data = await apiRequest(
-            `${API_BASE}${endpoint}`
+            `${API_BASE}${endpoint}?repository_id=${encodeURIComponent(
+              repositoryId
+            )}`
           );
 
           results[key] =
@@ -584,7 +585,8 @@ function App() {
       );
 
       setGraphMessage(
-        "Unable to load graph analysis."
+        error.message ||
+          "Unable to load graph analysis."
       );
     } finally {
       setGraphLoading(false);
@@ -1214,10 +1216,12 @@ function App() {
           onClick={
             loadGraphData
           }
-          disabled={graphLoading}
+          disabled={graphLoading || !repositoryId}
         >
           {graphLoading
             ? "Loading Graph Analysis..."
+            : !repositoryId
+            ? "Select Repository First"
             : "Load Graph Analysis"}
         </button>
 
