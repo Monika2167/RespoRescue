@@ -2,8 +2,11 @@ from pathlib import Path
 
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
 
 from backend.security import get_current_user
+from backend.database import get_db
+from backend.models import Repository
 
 
 # ============================================================
@@ -17,30 +20,41 @@ router = APIRouter(
 
 
 # ============================================================
-# GRAPH DATA DIRECTORY
+# REPOSITORY GRAPH DATA
+#
+# Each selected repository must have its own graph output:
+#
+# data/
+#   repositories/
+#       <repository_id>/
+#           graph/
+#
+# This prevents one repository's graph data from being
+# accidentally served for another repository.
 # ============================================================
 
-GRAPH_DIR = (
+DATA_DIR = (
     Path(__file__).resolve().parent.parent
     / "data"
-    / "graph"
 )
 
+REPOSITORY_DATA_DIR = DATA_DIR / "repositories"
+
 
 # ============================================================
-# GRAPH DATA FILES
+# GRAPH DATA FILE NAMES
 # ============================================================
 
-FILES = {
-    "nodes": GRAPH_DIR / "graph_nodes.csv",
-    "edges": GRAPH_DIR / "graph_edges.csv",
-    "impact": GRAPH_DIR / "impact_analysis.csv",
-    "knowledge": GRAPH_DIR / "knowledge_concentration.csv",
-    "temporal": GRAPH_DIR / "temporal_features.csv",
-    "what_if": GRAPH_DIR / "what_if_results.csv",
-    "developers": GRAPH_DIR / "developer_features.csv",
-    "developer_file": GRAPH_DIR / "developer_file_relationships.csv",
-    "file_features": GRAPH_DIR / "file_features.csv",
+GRAPH_FILE_NAMES = {
+    "nodes": "graph_nodes.csv",
+    "edges": "graph_edges.csv",
+    "impact": "impact_analysis.csv",
+    "knowledge": "knowledge_concentration.csv",
+    "temporal": "temporal_features.csv",
+    "what_if": "what_if_results.csv",
+    "developers": "developer_features.csv",
+    "developer_file": "developer_file_relationships.csv",
+    "file_features": "file_features.csv",
 }
 
 
@@ -55,7 +69,6 @@ EXPECTED_COLUMNS = {
         "node_type",
         "issue_number",
         "pr_number",
-        "commit_sha",
         "file_name",
         "developer",
     ],
@@ -93,15 +106,11 @@ EXPECTED_COLUMNS = {
     ],
 
     "what_if": [
-        "file_name",
-        "dominant_developer",
-        "dominant_developer_share",
-        "total_commits",
-        "unique_developers",
-        "files_losing_dominant_contributor",
-        "files_with_no_remaining_contributor",
-        "remaining_contributor_share",
-        "high_concentration_flag",
+        "scenario_type",
+        "scenario_count",
+        "average_affected_entities",
+        "maximum_affected_entities",
+        "simulated_count",
     ],
 
     "developers": [
@@ -111,7 +120,6 @@ EXPECTED_COLUMNS = {
     ],
 
     "developer_file": [
-        "commit_sha",
         "author",
         "file_name",
     ],
@@ -125,28 +133,119 @@ EXPECTED_COLUMNS = {
 
 
 # ============================================================
+# VERIFY REPOSITORY ACCESS
+# ============================================================
+
+def verify_repository_access(
+    repository_id: int,
+    current_user: dict,
+    db: Session
+):
+    repository = (
+        db.query(Repository)
+        .filter(
+            Repository.id == repository_id,
+            Repository.owner_id == current_user["user_id"]
+        )
+        .first()
+    )
+
+    if not repository:
+        raise HTTPException(
+            status_code=404,
+            detail="Repository not found or access denied"
+        )
+
+    return repository
+
+
+# ============================================================
+# GET REPOSITORY GRAPH DIRECTORY
+# ============================================================
+
+def get_repository_graph_dir(
+    repository_id: int
+) -> Path:
+
+    repository_graph_dir = (
+        REPOSITORY_DATA_DIR
+        / str(repository_id)
+        / "graph"
+    )
+
+    return repository_graph_dir
+
+
+# ============================================================
+# GET REPOSITORY GRAPH FILES
+# ============================================================
+
+def get_repository_files(
+    repository_id: int
+):
+
+    graph_dir = get_repository_graph_dir(
+        repository_id
+    )
+
+    return {
+        name: graph_dir / filename
+        for name, filename in GRAPH_FILE_NAMES.items()
+    }
+
+
+# ============================================================
 # LOAD GRAPH DATA
 # ============================================================
 
-def load_graph_data(name: str):
+def load_graph_data(
+    name: str,
+    repository_id: int
+):
 
-    file_path = FILES[name]
+    files = get_repository_files(
+        repository_id
+    )
 
-    # Check whether file exists
-    if not file_path.exists():
+    if name not in files:
         raise HTTPException(
-            status_code=404,
-            detail=(
-                f"Graph output file not found: "
-                f"{file_path.name}"
-            )
+            status_code=500,
+            detail=f"Unknown graph dataset: {name}"
         )
 
+    file_path = files[name]
+
+    # --------------------------------------------------------
+    # Repository-specific output must exist.
+    # --------------------------------------------------------
+
+    if not file_path.exists():
+
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "message": (
+                    "Repository-specific graph data "
+                    "is not available yet."
+                ),
+                "repository_id": repository_id,
+                "dataset": name,
+                "expected_file": str(file_path),
+            }
+        )
+
+    # --------------------------------------------------------
     # Read CSV
+    # --------------------------------------------------------
+
     try:
-        df = pd.read_csv(file_path)
+
+        df = pd.read_csv(
+            file_path
+        )
 
     except Exception as error:
+
         raise HTTPException(
             status_code=500,
             detail=(
@@ -155,7 +254,10 @@ def load_graph_data(name: str):
             )
         )
 
-    # Check expected columns
+    # --------------------------------------------------------
+    # Validate expected columns
+    # --------------------------------------------------------
+
     expected = EXPECTED_COLUMNS[name]
 
     missing_columns = [
@@ -177,10 +279,16 @@ def load_graph_data(name: str):
             }
         )
 
-    # Keep only expected columns
+    # --------------------------------------------------------
+    # Keep expected columns only
+    # --------------------------------------------------------
+
     df = df[expected]
 
+    # --------------------------------------------------------
     # Convert NaN -> None
+    # --------------------------------------------------------
+
     df = df.astype(object).where(
         pd.notna(df),
         None
@@ -194,25 +302,35 @@ def load_graph_data(name: str):
 # Used for smaller datasets
 # ============================================================
 
-def dataframe_response(name: str):
+def dataframe_response(
+    name: str,
+    repository_id: int
+):
 
-    df = load_graph_data(name)
+    df = load_graph_data(
+        name,
+        repository_id
+    )
+
+    files = get_repository_files(
+        repository_id
+    )
 
     return {
+
         "success": True,
 
-        "source_file": FILES[name].name,
+        "repository_id": repository_id,
+
+        "source_file": files[name].name,
 
         "total_records": len(df),
 
-        "repository_isolation": False,
+        "repository_isolation": True,
 
         "repository_note": (
-            "This graph output does not contain "
-            "a repository identifier. "
-            "The current dataset is therefore "
-            "not independently filterable "
-            "by repository."
+            "Data is loaded from the selected "
+            "repository-specific graph dataset."
         ),
 
         "data": df.to_dict(
@@ -224,7 +342,6 @@ def dataframe_response(name: str):
 # ============================================================
 # NODES
 # graph_nodes.csv
-# Around 37,682 records
 # PAGINATION ENABLED
 # ============================================================
 
@@ -242,12 +359,30 @@ def get_graph_nodes(
         ge=0
     ),
 
+    repository_id: int = Query(
+        ...,
+        ge=1
+    ),
+
+    db: Session = Depends(
+        get_db
+    ),
+
     current_user: dict = Depends(
         get_current_user
     )
 ):
 
-    df = load_graph_data("nodes")
+    verify_repository_access(
+        repository_id,
+        current_user,
+        db
+    )
+
+    df = load_graph_data(
+        "nodes",
+        repository_id
+    )
 
     total_records = len(df)
 
@@ -255,11 +390,17 @@ def get_graph_nodes(
         offset:offset + limit
     ]
 
+    files = get_repository_files(
+        repository_id
+    )
+
     return {
 
         "success": True,
 
-        "source_file": FILES["nodes"].name,
+        "repository_id": repository_id,
+
+        "source_file": files["nodes"].name,
 
         "total_records": total_records,
 
@@ -271,14 +412,11 @@ def get_graph_nodes(
 
         "offset": offset,
 
-        "repository_isolation": False,
+        "repository_isolation": True,
 
         "repository_note": (
-            "This graph output does not contain "
-            "a repository identifier. "
-            "The current dataset is therefore "
-            "not independently filterable "
-            "by repository."
+            "Data belongs to the authenticated "
+            "user's selected repository."
         ),
 
         "data": paginated_df.to_dict(
@@ -290,7 +428,6 @@ def get_graph_nodes(
 # ============================================================
 # EDGES
 # graph_edges.csv
-# Around 478,773 records
 # PAGINATION ENABLED
 # ============================================================
 
@@ -308,12 +445,30 @@ def get_graph_edges(
         ge=0
     ),
 
+    repository_id: int = Query(
+        ...,
+        ge=1
+    ),
+
+    db: Session = Depends(
+        get_db
+    ),
+
     current_user: dict = Depends(
         get_current_user
     )
 ):
 
-    df = load_graph_data("edges")
+    verify_repository_access(
+        repository_id,
+        current_user,
+        db
+    )
+
+    df = load_graph_data(
+        "edges",
+        repository_id
+    )
 
     total_records = len(df)
 
@@ -321,11 +476,17 @@ def get_graph_edges(
         offset:offset + limit
     ]
 
+    files = get_repository_files(
+        repository_id
+    )
+
     return {
 
         "success": True,
 
-        "source_file": FILES["edges"].name,
+        "repository_id": repository_id,
+
+        "source_file": files["edges"].name,
 
         "total_records": total_records,
 
@@ -337,14 +498,11 @@ def get_graph_edges(
 
         "offset": offset,
 
-        "repository_isolation": False,
+        "repository_isolation": True,
 
         "repository_note": (
-            "This graph output does not contain "
-            "a repository identifier. "
-            "The current dataset is therefore "
-            "not independently filterable "
-            "by repository."
+            "Data belongs to the authenticated "
+            "user's selected repository."
         ),
 
         "data": paginated_df.to_dict(
@@ -356,7 +514,6 @@ def get_graph_edges(
 # ============================================================
 # IMPACT ANALYSIS
 # impact_analysis.csv
-# Around 558,908 records
 # PAGINATION ENABLED
 # ============================================================
 
@@ -374,12 +531,30 @@ def get_graph_impact(
         ge=0
     ),
 
+    repository_id: int = Query(
+        ...,
+        ge=1
+    ),
+
+    db: Session = Depends(
+        get_db
+    ),
+
     current_user: dict = Depends(
         get_current_user
     )
 ):
 
-    df = load_graph_data("impact")
+    verify_repository_access(
+        repository_id,
+        current_user,
+        db
+    )
+
+    df = load_graph_data(
+        "impact",
+        repository_id
+    )
 
     total_records = len(df)
 
@@ -387,11 +562,17 @@ def get_graph_impact(
         offset:offset + limit
     ]
 
+    files = get_repository_files(
+        repository_id
+    )
+
     return {
 
         "success": True,
 
-        "source_file": FILES["impact"].name,
+        "repository_id": repository_id,
+
+        "source_file": files["impact"].name,
 
         "total_records": total_records,
 
@@ -403,14 +584,11 @@ def get_graph_impact(
 
         "offset": offset,
 
-        "repository_isolation": False,
+        "repository_isolation": True,
 
         "repository_note": (
-            "This graph output does not contain "
-            "a repository identifier. "
-            "The current dataset is therefore "
-            "not independently filterable "
-            "by repository."
+            "Impact data belongs to the "
+            "authenticated user's selected repository."
         ),
 
         "data": paginated_df.to_dict(
@@ -422,97 +600,194 @@ def get_graph_impact(
 # ============================================================
 # KNOWLEDGE CONCENTRATION
 # knowledge_concentration.csv
-# Around 11,200 records
+# PAGINATION ENABLED
 # ============================================================
+
 @router.get("/knowledge-concentration")
 def get_knowledge_concentration(
-    limit: int = Query(50, ge=1, le=500),
-    offset: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user)
+
+    limit: int = Query(
+        50,
+        ge=1,
+        le=500
+    ),
+
+    offset: int = Query(
+        0,
+        ge=0
+    ),
+
+    repository_id: int = Query(
+        ...,
+        ge=1
+    ),
+
+    db: Session = Depends(
+        get_db
+    ),
+
+    current_user: dict = Depends(
+        get_current_user
+    )
 ):
-    df = load_graph_data("knowledge")
+
+    verify_repository_access(
+        repository_id,
+        current_user,
+        db
+    )
+
+    df = load_graph_data(
+        "knowledge",
+        repository_id
+    )
 
     total_records = len(df)
-    paginated_df = df.iloc[offset:offset + limit]
+
+    paginated_df = df.iloc[
+        offset:offset + limit
+    ]
+
+    files = get_repository_files(
+        repository_id
+    )
 
     return {
+
         "success": True,
-        "source_file": FILES["knowledge"].name,
+
+        "repository_id": repository_id,
+
+        "source_file": files["knowledge"].name,
+
         "total_records": total_records,
-        "returned_records": len(paginated_df),
-        "limit": limit,
-        "offset": offset,
-        "repository_isolation": False,
-        "repository_note": (
-            "This graph output does not contain a repository identifier. "
-            "The current dataset is therefore not independently filterable "
-            "by repository."
+
+        "returned_records": len(
+            paginated_df
         ),
-        "data": paginated_df.to_dict(orient="records"),
+
+        "limit": limit,
+
+        "offset": offset,
+
+        "repository_isolation": True,
+
+        "repository_note": (
+            "Knowledge concentration data belongs "
+            "to the authenticated user's selected repository."
+        ),
+
+        "data": paginated_df.to_dict(
+            orient="records"
+        ),
     }
 
 
 # ============================================================
 # TEMPORAL FEATURES
 # temporal_features.csv
-# Around 36 records
 # ============================================================
 
 @router.get("/temporal")
 def get_temporal_features(
+
+    repository_id: int = Query(
+        ...,
+        ge=1
+    ),
+
+    db: Session = Depends(
+        get_db
+    ),
 
     current_user: dict = Depends(
         get_current_user
     )
 ):
 
+    verify_repository_access(
+        repository_id,
+        current_user,
+        db
+    )
+
     return dataframe_response(
-        "temporal"
+        "temporal",
+        repository_id
     )
 
 
 # ============================================================
 # WHAT-IF ANALYSIS
 # what_if_results.csv
-# Around 11,200 records
 # ============================================================
 
 @router.get("/what-if")
 def get_what_if_results(
+
+    repository_id: int = Query(
+        ...,
+        ge=1
+    ),
+
+    db: Session = Depends(
+        get_db
+    ),
 
     current_user: dict = Depends(
         get_current_user
     )
 ):
 
+    verify_repository_access(
+        repository_id,
+        current_user,
+        db
+    )
+
     return dataframe_response(
-        "what_if"
+        "what_if",
+        repository_id
     )
 
 
 # ============================================================
 # DEVELOPER FEATURES
 # developer_features.csv
-# Around 485 records
 # ============================================================
 
 @router.get("/developers")
 def get_developer_features(
+
+    repository_id: int = Query(
+        ...,
+        ge=1
+    ),
+
+    db: Session = Depends(
+        get_db
+    ),
 
     current_user: dict = Depends(
         get_current_user
     )
 ):
 
+    verify_repository_access(
+        repository_id,
+        current_user,
+        db
+    )
+
     return dataframe_response(
-        "developers"
+        "developers",
+        repository_id
     )
 
 
 # ============================================================
 # DEVELOPER-FILE RELATIONSHIPS
 # developer_file_relationships.csv
-# Around 169,834 records
 # PAGINATION ENABLED
 # ============================================================
 
@@ -530,13 +805,29 @@ def get_developer_file_relationships(
         ge=0
     ),
 
+    repository_id: int = Query(
+        ...,
+        ge=1
+    ),
+
+    db: Session = Depends(
+        get_db
+    ),
+
     current_user: dict = Depends(
         get_current_user
     )
 ):
 
+    verify_repository_access(
+        repository_id,
+        current_user,
+        db
+    )
+
     df = load_graph_data(
-        "developer_file"
+        "developer_file",
+        repository_id
     )
 
     total_records = len(df)
@@ -545,12 +836,18 @@ def get_developer_file_relationships(
         offset:offset + limit
     ]
 
+    files = get_repository_files(
+        repository_id
+    )
+
     return {
 
         "success": True,
 
+        "repository_id": repository_id,
+
         "source_file": (
-            FILES["developer_file"].name
+            files["developer_file"].name
         ),
 
         "total_records": total_records,
@@ -563,14 +860,11 @@ def get_developer_file_relationships(
 
         "offset": offset,
 
-        "repository_isolation": False,
+        "repository_isolation": True,
 
         "repository_note": (
-            "This graph output does not contain "
-            "a repository identifier. "
-            "The current dataset is therefore "
-            "not independently filterable "
-            "by repository."
+            "Developer-file data belongs to "
+            "the authenticated user's selected repository."
         ),
 
         "data": paginated_df.to_dict(
@@ -582,17 +876,32 @@ def get_developer_file_relationships(
 # ============================================================
 # FILE FEATURES
 # file_features.csv
-# Around 11,200 records
 # ============================================================
 
 @router.get("/file-features")
 def get_file_features(
+
+    repository_id: int = Query(
+        ...,
+        ge=1
+    ),
+
+    db: Session = Depends(
+        get_db
+    ),
 
     current_user: dict = Depends(
         get_current_user
     )
 ):
 
+    verify_repository_access(
+        repository_id,
+        current_user,
+        db
+    )
+
     return dataframe_response(
-        "file_features"
+        "file_features",
+        repository_id
     )
