@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 # Configuration
 # ---------------------------------------
 
-REPO = "microsoft/vscode"
+REPO = os.getenv("REPO", "microsoft/vscode")
 TOTAL_PRS = 5000
 PER_PAGE = 100
 
